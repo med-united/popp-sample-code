@@ -63,7 +63,7 @@ class CardRestControllerTest {
     mockMvc
         .perform(get("/token/contact-standard").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("OK"));
+        .andExpect(content().string("No token received"));
 
     verify(communicationServiceMock)
         .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
@@ -78,7 +78,7 @@ class CardRestControllerTest {
     mockMvc
         .perform(get("/token/contact-connector").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("OK"));
+        .andExpect(content().string("No token received"));
     verify(communicationServiceMock).start(CardConnectionType.CONTACT_CONNECTOR, "");
     verify(cardReaderServiceMock, never()).startCheckForCardReader();
   }
@@ -93,7 +93,10 @@ class CardRestControllerTest {
             get("/token/contact-connector-via-standard-terminal")
                 .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("OK"));
+        .andExpect(
+            content()
+                .string(
+                    "eyJraWQiOiI0SVZZSHk3MjFLMHJualo4XzlmbnNLb2ZzMGVLaEdPY3FFRFZvMFJCWkZRIiwidHlwIjoidm5kLnRlbGVtYXRpay5wb3BwK2p3dCIsImFsZyI6IkVTMjU2In0.eyJwcm9vZk1ldGhvZCI6ImVoYy1wcmFjdGl0aW9uZXItdHJ1c3RlZGNoYW5uZWwiLCJwYXRpZW50UHJvb2ZUaW1lIjoxNzcwNzUzNjI4LCJhY3RvcklkIjoidGVsZW1hdGlrLWlkIiwicGF0aWVudElkIjoiSzIxMDE0MDE1NSIsImF1dGhvcml6YXRpb25fZGV0YWlscyI6ImRldGFpbHMiLCJpc3MiOiJodHRwczovL3BvcHAuZXhhbXBsZS5jb20iLCJhY3RvclByb2Zlc3Npb25PaWQiOiIxLjIuMjc2LjAuNzYuNC41MCIsInZlcnNpb24iOiIxLjAuMCIsImlhdCI6MTc3MDc1MzYyOCwiaW5zdXJlcklkIjoiMTAyMTcxMDEyIn0.9vmGOxSxwiebQHw_pqogWOVm-gbUp1MlytSY9uUdoNglthYV6-qwrnJgR_FBi_NOgMO_ZuGI8aN1hBaE-1nyoA"));
 
     verify(communicationServiceMock)
         .startConnectorMock(CardConnectionType.CONTACT_CONNECTOR, EMPTY_CLIENT_SESSION_ID);
@@ -108,7 +111,7 @@ class CardRestControllerTest {
     mockMvc
         .perform(get("/token/contactless-connector").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("OK"));
+        .andExpect(content().string("No token received"));
 
     verify(communicationServiceMock)
         .start(CardConnectionType.CONTACTLESS_CONNECTOR, EMPTY_CLIENT_SESSION_ID);
@@ -123,7 +126,7 @@ class CardRestControllerTest {
     mockMvc
         .perform(get("/token/contactless-standard").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("OK"));
+        .andExpect(content().string("No token received"));
 
     verify(communicationServiceMock)
         .start(CardConnectionType.CONTACTLESS_STANDARD, EMPTY_CLIENT_SESSION_ID);
@@ -141,7 +144,7 @@ class CardRestControllerTest {
             get("/token/contact-connector?clientsessionid=" + sessionId)
                 .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("OK"));
+        .andExpect(content().string("No token received"));
 
     verify(communicationServiceMock).start(CardConnectionType.CONTACT_CONNECTOR, sessionId);
     verify(cardReaderServiceMock, never()).startCheckForCardReader();
@@ -189,7 +192,7 @@ class CardRestControllerTest {
   @Test
   void getTokenReturnsErrorWhenExceptionIsThrown() throws Exception {
     // given
-    Mockito.doThrow(new RuntimeException("Error during communication"))
+    Mockito.doThrow(new RuntimeException("message"))
         .when(communicationServiceMock)
         .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
 
@@ -197,7 +200,7 @@ class CardRestControllerTest {
     mockMvc
         .perform(get("/token/contact-standard").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(content().string("Error during communication"));
+        .andExpect(content().string("Error during communication: message"));
 
     verify(communicationServiceMock)
         .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);

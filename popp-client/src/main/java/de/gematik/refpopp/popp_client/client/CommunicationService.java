@@ -44,6 +44,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -66,15 +69,41 @@ public class CommunicationService {
   private CardConnectionType pendingCardConnectionType;
   private String pendingClientSessionId;
 
-  public void start(final CardConnectionType cardConnectionType, final String clientSessionId) {
+  private Map<String, CompletableFuture<String>> pendingTokenRequests = new ConcurrentHashMap<>();
+
+  /**
+   * Starts the communication process with the server based on the specified card connection type
+   * and client session ID.
+   *
+   * <p>It returns a Future that will return the PoPP token once the communication process is
+   * completed and the token is received from the server.
+   *
+   * <p>The method handles both contact and contactless card connections, and it ensures that the
+   * appropriate communication flow is executed based on the connection type. If a client session ID
+   * is not provided, a new UUID will be generated for the session.
+   *
+   * @param cardConnectionType the type of card connection to be used for communication
+   * @param clientSessionId an optional client session ID; if not provided, a new UUID will be
+   *     generated
+   * @return a Future representing the asynchronous execution of the communication process
+   */
+  public Future<String> start(
+      final CardConnectionType cardConnectionType, final String clientSessionId) {
     if (isContactlessConnection(cardConnectionType)) {
       log.info("| PACE not yet completed, waiting for initialization...");
       pendingCardConnectionType = cardConnectionType;
       pendingClientSessionId = clientSessionId;
-      return;
+      return null; // Return null or an appropriate Future indicating that the process is pending
     }
 
+    var future = new CompletableFuture<String>();
+    if (clientSessionId != null) {
+      pendingTokenRequests.put(clientSessionId, future);
+    } else {
+      log.warn("| No clientSessionId provided, token cannot be associated with a session.");
+    }
     executeStart(cardConnectionType, clientSessionId);
+    return future;
   }
 
   private void executeStart(
@@ -210,6 +239,18 @@ public class CommunicationService {
 
   private void handleTokenMessage(final TokenMessage tokenMessage) {
     log.info("| Received PoPP token: {}", tokenMessage.getToken());
+    final var sslSession = clientServerCommunicationService.getSSLSession();
+    final var clientSessionId = (String) sslSession.getValue(CLIENT_SESSION_ID);
+    if(clientSessionId != null) {   
+      final var future = pendingTokenRequests.remove(clientSessionId);
+      if (future != null) {
+        future.complete(tokenMessage.getToken());
+      } else {
+        log.warn("| No pending token request found for clientSessionId {}", clientSessionId);
+      }
+    } else {
+        log.warn("| No clientSessionId found in SSL session.");
+    }
     stopConnectorSessionIfRequired();
   }
 

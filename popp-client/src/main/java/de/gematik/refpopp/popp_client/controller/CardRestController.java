@@ -23,6 +23,8 @@ package de.gematik.refpopp.popp_client.controller;
 import de.gematik.poppcommons.api.enums.CardConnectionType;
 import de.gematik.refpopp.popp_client.cardreader.CardReader;
 import de.gematik.refpopp.popp_client.client.CommunicationService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,26 +52,31 @@ public class CardRestController {
       @RequestParam(name = "clientsessionid", required = false, defaultValue = "")
           final String clientSessionId) {
 
+    Future<String> tokenFuture;
     try {
       switch (communicationType.toLowerCase()) {
         case "contact-standard":
           cardReaderService.startCheckForCardReader();
-          communicationService.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
+          tokenFuture =
+              communicationService.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
           break;
         case "contact-connector":
-          communicationService.start(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
+          tokenFuture =
+              communicationService.start(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
           break;
         case "contact-connector-via-standard-terminal":
           cardReaderService.startCheckForCardReader();
           communicationService.startConnectorMock(
               CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
-          break;
+          return "eyJraWQiOiI0SVZZSHk3MjFLMHJualo4XzlmbnNLb2ZzMGVLaEdPY3FFRFZvMFJCWkZRIiwidHlwIjoidm5kLnRlbGVtYXRpay5wb3BwK2p3dCIsImFsZyI6IkVTMjU2In0.eyJwcm9vZk1ldGhvZCI6ImVoYy1wcmFjdGl0aW9uZXItdHJ1c3RlZGNoYW5uZWwiLCJwYXRpZW50UHJvb2ZUaW1lIjoxNzcwNzUzNjI4LCJhY3RvcklkIjoidGVsZW1hdGlrLWlkIiwicGF0aWVudElkIjoiSzIxMDE0MDE1NSIsImF1dGhvcml6YXRpb25fZGV0YWlscyI6ImRldGFpbHMiLCJpc3MiOiJodHRwczovL3BvcHAuZXhhbXBsZS5jb20iLCJhY3RvclByb2Zlc3Npb25PaWQiOiIxLjIuMjc2LjAuNzYuNC41MCIsInZlcnNpb24iOiIxLjAuMCIsImlhdCI6MTc3MDc1MzYyOCwiaW5zdXJlcklkIjoiMTAyMTcxMDEyIn0.9vmGOxSxwiebQHw_pqogWOVm-gbUp1MlytSY9uUdoNglthYV6-qwrnJgR_FBi_NOgMO_ZuGI8aN1hBaE-1nyoA";
         case "contactless-standard":
           cardReaderService.startCheckForCardReader();
-          communicationService.start(CardConnectionType.CONTACTLESS_STANDARD, clientSessionId);
+          tokenFuture =
+              communicationService.start(CardConnectionType.CONTACTLESS_STANDARD, clientSessionId);
           break;
         case "contactless-connector":
-          communicationService.start(CardConnectionType.CONTACTLESS_CONNECTOR, clientSessionId);
+          tokenFuture =
+              communicationService.start(CardConnectionType.CONTACTLESS_CONNECTOR, clientSessionId);
           break;
         case "g3":
           log.info("| G3 not yet implemented");
@@ -78,10 +85,10 @@ public class CardRestController {
           log.error("| Unknown command: {}", communicationType);
           return "Unknown command";
       }
+      return tokenFuture != null ? tokenFuture.get(10, TimeUnit.SECONDS) : "No token received";
     } catch (final Exception e) {
       log.error("| Error during communication: {}", e.getMessage());
-      return "Error during communication";
+      return "Error during communication: " + e.getMessage();
     }
-    return "OK";
   }
 }

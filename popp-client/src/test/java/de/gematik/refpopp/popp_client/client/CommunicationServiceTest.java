@@ -329,7 +329,7 @@ class CommunicationServiceTest {
     sut.handleServerEvent(event);
 
     // then
-    verify(clientServerCommunicationServiceMock).getSSLSession();
+    verify(clientServerCommunicationServiceMock, times(2)).getSSLSession();
     verifyNoInteractions(cardCommunicationServiceMock);
   }
 
@@ -351,7 +351,7 @@ class CommunicationServiceTest {
     sut.handleServerEvent(event);
 
     // then
-    verify(clientServerCommunicationServiceMock).getSSLSession();
+    verify(clientServerCommunicationServiceMock, times(2)).getSSLSession();
     verify(connectorCommunicationServiceMock).stopCardSession("clientSessionId");
     verifyNoInteractions(cardCommunicationServiceMock);
   }
