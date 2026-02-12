@@ -241,7 +241,7 @@ public class CommunicationService {
     log.info("| Received PoPP token: {}", tokenMessage.getToken());
     final var sslSession = clientServerCommunicationService.getSSLSession();
     final var clientSessionId = (String) sslSession.getValue(CLIENT_SESSION_ID);
-    if(clientSessionId != null) {   
+    if (clientSessionId != null) {
       final var future = pendingTokenRequests.remove(clientSessionId);
       if (future != null) {
         future.complete(tokenMessage.getToken());
@@ -249,7 +249,7 @@ public class CommunicationService {
         log.warn("| No pending token request found for clientSessionId {}", clientSessionId);
       }
     } else {
-        log.warn("| No clientSessionId found in SSL session.");
+      log.warn("| No clientSessionId found in SSL session.");
     }
     stopConnectorSessionIfRequired();
   }

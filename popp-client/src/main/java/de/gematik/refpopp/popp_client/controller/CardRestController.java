@@ -85,7 +85,7 @@ public class CardRestController {
           log.error("| Unknown command: {}", communicationType);
           return "Unknown command";
       }
-      return tokenFuture != null ? tokenFuture.get(10, TimeUnit.SECONDS) : "No token received";
+      return tokenFuture != null ? tokenFuture.get(30, TimeUnit.SECONDS) : "No token received";
     } catch (final Exception e) {
       log.error("| Error during communication: {}", e.getMessage());
       return "Error during communication: " + e.getMessage();
