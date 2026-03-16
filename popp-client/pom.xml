@@ -154,16 +154,6 @@
       <artifactId>nimbus-jose-jwt</artifactId>
       <version>10.9.1</version>
     </dependency>
-    <dependency>
-        <groupId>ca.uhn.hapi.fhir</groupId>
-        <artifactId>hapi-fhir-base</artifactId>
-        <version>6.8.0</version>
-    </dependency>
-    <dependency>
-        <groupId>ca.uhn.hapi.fhir</groupId>
-        <artifactId>hapi-fhir-structures-r4</artifactId>
-        <version>6.8.0</version>
-    </dependency>
   </dependencies>
 
   <build>
@@ -576,22 +566,6 @@
                       <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
                   </configuration>
               </execution>
-          <execution>
-            <id>vsd-service</id>
-            <goals>
-              <goal>wsimport</goal>
-            </goals>
-            <configuration>
-              <wsdlDirectory>
-                src/main/resources/api-telematik-OPB4
-              </wsdlDirectory>
-              <wsdlFiles>
-                <wsdlFile>conn/vsds/VSDService.wsdl</wsdlFile>
-              </wsdlFiles>
-              <keep>true</keep>
-              <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
-            </configuration>
-          </execution>
           <execution>
             <id>signatureservice74</id>
             <goals>
