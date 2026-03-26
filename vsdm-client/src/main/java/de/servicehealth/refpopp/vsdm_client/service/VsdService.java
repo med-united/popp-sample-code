@@ -23,14 +23,11 @@ package de.servicehealth.refpopp.vsdm_client.service;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSDResponse;
 import de.servicehealth.refpopp.vsdm_client.converter.VsdmConverter;
-import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.util.FileCopyUtils;
 import org.springframework.web.client.RestTemplate;
 
 @Service
@@ -50,13 +47,15 @@ public class VsdService {
   @Value("${popp.client.session-id:123456}")
   private String clientSessionId;
 
+  @Value("${vsdm.mock.url:http://localhost:8082}")
+  private String vsdmMockUrl;
+
   public VsdService(VsdmConverter vsdmConverter) {
     this.vsdmConverter = vsdmConverter;
 
-    // Set timeouts using SimpleClientHttpRequestFactory instead of RestTemplateBuilder
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-    factory.setConnectTimeout(5000); // 5000 ms = 5 seconds
-    factory.setReadTimeout(10000); // 10000 ms = 10 seconds
+    factory.setConnectTimeout(5000);
+    factory.setReadTimeout(10000);
     this.restTemplate = new RestTemplate(factory);
   }
 
@@ -64,22 +63,44 @@ public class VsdService {
     logger.info("Processing ReadVSD request in the service layer.");
 
     try {
-      // Read example FHIR bundle file from the resources folder
-      ClassPathResource resource =
-          new ClassPathResource("fhir_bundle/019aa697-e026-7735-b898-09ead32a7fa5.xml");
-      byte[] bundleData = FileCopyUtils.copyToByteArray(resource.getInputStream());
-      String fhirBundle = new String(bundleData, StandardCharsets.UTF_8);
-
-      // Retrieve the POPP token via the API (via POST)
+      // Step 1: Get the PoPP token
       String poppToken = fetchPoppToken();
 
-      // Call the conversion via the VSDM Converter
+      // Step 2: Extract EhcHandle from the request (card handle, not KVNR)
+      String ehcHandle = request.getEhcHandle();
+      logger.info("Fetching FHIR bundle for EhcHandle: {}", ehcHandle);
+
+      // Step 3: Call the VSDM 2.0 backend (mock) with the PoPP token
+      String fhirBundle = fetchFhirBundle(ehcHandle, poppToken);
+
+      // Step 4: Convert FHIR bundle to ReadVSDResponse
       return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
 
     } catch (Exception e) {
-      logger.error("Error reading or converting the FHIR bundle", e);
-      ReadVSDResponse fallbackResponse = new ReadVSDResponse();
-      return fallbackResponse;
+      logger.error("Error processing ReadVSD request", e);
+      return new ReadVSDResponse();
+    }
+  }
+
+  private String fetchFhirBundle(String kvnr, String poppToken) {
+    String url = vsdmMockUrl + "/vsdm/bundle/" + kvnr;
+    logger.info("Calling VSDM 2.0 backend at: {}", url);
+
+    try {
+      org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+      headers.set("Authorization", "Bearer " + poppToken);
+      org.springframework.http.HttpEntity<Void> entity =
+          new org.springframework.http.HttpEntity<>(headers);
+
+      org.springframework.http.ResponseEntity<String> response =
+          restTemplate.exchange(url, org.springframework.http.HttpMethod.GET, entity, String.class);
+
+      logger.info("Successfully fetched FHIR bundle for KVNR: {}", kvnr);
+      return response.getBody();
+
+    } catch (Exception e) {
+      logger.error("Failed to fetch FHIR bundle from VSDM backend: {}", e.getMessage());
+      throw e;
     }
   }
 
@@ -95,8 +116,7 @@ public class VsdService {
       if (response != null && response.token() != null && !response.token().isBlank()) {
         return response.token();
       } else {
-        logger.warn(
-            "Unexpected response or empty token from POPP client. Response was: {}", response);
+        logger.warn("Unexpected response or empty token. Response was: {}", response);
         return "";
       }
     } catch (Exception e) {
@@ -105,7 +125,6 @@ public class VsdService {
     }
   }
 
-  // Typensichere Datenstrukturen (DTOs) für die REST-Kommunikation
   private record TokenRequest(String communicationType, String clientSessionId) {}
 
   private record TokenResponse(String token, String error) {}
