@@ -123,7 +123,7 @@
                 </args>
                 <dockerFile>${basedir}/target/tmpdocker/Dockerfile</dockerFile>
               </build>
-              <name>${docker.image.name}:latest</name>
+              <name>${docker.image.name}:${project.version}</name>
             </image>
           </images>
           <skip>${skip.dockerbuild}</skip>

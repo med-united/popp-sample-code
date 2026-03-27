@@ -16,6 +16,12 @@
   <name>vsdm-mock</name>
   <description>Mock VSDM 2.0 Backend</description>
 
+  <properties>
+    <docker.image.name>${docker.registry.gematik}/popp/vsdm-mock</docker.image.name>
+    <commit_hash>undefined</commit_hash>
+    <skip.dockerbuild>false</skip.dockerbuild>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -51,11 +57,11 @@
                 <resource>
                   <directory>${basedir}/target</directory>
                   <includes>
-                    <include>vsdm-client*.jar</include>
+                    <include>vsdm-mock*.jar</include>
                   </includes>
                   <excludes>
-                    <exclude>vsdm-client-*-javadoc.jar</exclude>
-                    <exclude>vsdm-client-*-sources.jar</exclude>
+                    <exclude>vsdm-mock-*-javadoc.jar</exclude>
+                    <exclude>vsdm-mock-*-sources.jar</exclude>
                   </excludes>
                 </resource>
               </resources>
@@ -83,7 +89,7 @@
                 </args>
                 <dockerFile>${basedir}/target/tmpdocker/Dockerfile</dockerFile>
               </build>
-              <name>${docker.image.name}:latest</name>
+              <name>${docker.image.name}:${project.version}</name>
             </image>
           </images>
           <skip>${skip.dockerbuild}</skip>

@@ -1,7 +1,7 @@
 services:
   popp-client:
     profiles: [ "full" ]
-    image: local/popp/popp-client:1.0.4-SNAPSHOT
+    image: local/popp/popp-client:2.0.0
     container_name: popp-client
     environment:
       - POPP_SERVER_URL=wss://popp-server:8443/ws
@@ -42,7 +42,7 @@ services:
       - popp-network
 
   vsdm-mock:
-    image: local/popp/vsdm-mock:latest
+    image: local/popp/vsdm-mock:2.0.0
     container_name: vsdm-mock
     ports:
       - "8082:8082"
@@ -50,7 +50,7 @@ services:
       - popp-network
 
   vsdm-client:
-    image: local/popp/vsdm-client:latest
+    image: local/popp/vsdm-client:2.0.0
     container_name: vsdm-client
     ports:
       - "8080:8080"
