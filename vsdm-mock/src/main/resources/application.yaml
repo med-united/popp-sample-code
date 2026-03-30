@@ -1,0 +1,10 @@
+server:
+  port: 8082
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: password
+    key-store-type: PKCS12
+spring:
+  application:
+    name: vsdm-mock
