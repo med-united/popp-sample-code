@@ -39,6 +39,7 @@ public class VsdService {
   private static final Logger logger = LoggerFactory.getLogger(VsdService.class);
 
   private final VsdmConverter vsdmConverter;
+  private final Vsdm2Client vsdm2Client;
   private final RestTemplate restTemplate;
 
   @Value("${popp.client.api.url:http://localhost:8081/token}")
@@ -50,8 +51,12 @@ public class VsdService {
   @Value("${popp.client.session-id:123456}")
   private String clientSessionId;
 
-  public VsdService(VsdmConverter vsdmConverter) {
+  @Value("${vsdm.mock.url:https://localhost:8082}")
+  private String vsdmMockUrl;
+
+  public VsdService(VsdmConverter vsdmConverter, Vsdm2Client vsdm2Client) {
     this.vsdmConverter = vsdmConverter;
+    this.vsdm2Client = vsdm2Client;
 
     // Set timeouts using SimpleClientHttpRequestFactory instead of RestTemplateBuilder
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -64,22 +69,23 @@ public class VsdService {
     logger.info("Processing ReadVSD request in the service layer.");
 
     try {
-      // Read example FHIR bundle file from the resources folder
-      ClassPathResource resource =
-          new ClassPathResource("fhir_bundle/019aa697-e026-7735-b898-09ead32a7fa5.xml");
-      byte[] bundleData = FileCopyUtils.copyToByteArray(resource.getInputStream());
-      String fhirBundle = new String(bundleData, StandardCharsets.UTF_8);
-
-      // Retrieve the POPP token via the API (via POST)
+      // Step 1: Get the PoPP token
       String poppToken = fetchPoppToken();
 
-      // Call the conversion via the VSDM Converter
+      // Step 2: Extract EhcHandle from the request (card handle, not KVNR)
+      String ehcHandle = request.getEhcHandle();
+      logger.info("Fetching FHIR bundle for EhcHandle: {}", ehcHandle);
+
+      // Step 3: Call the VSDM 2.0 backend (mock) with the PoPP token
+      // String fhirBundle = fetchFhirBundle(ehcHandle, poppToken);
+      String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
+
+      // Step 4: Convert FHIR bundle to ReadVSDResponse
       return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
 
     } catch (Exception e) {
-      logger.error("Error reading or converting the FHIR bundle", e);
-      ReadVSDResponse fallbackResponse = new ReadVSDResponse();
-      return fallbackResponse;
+      logger.error("Error processing ReadVSD request", e);
+      return new ReadVSDResponse();
     }
   }
 
@@ -95,8 +101,7 @@ public class VsdService {
       if (response != null && response.token() != null && !response.token().isBlank()) {
         return response.token();
       } else {
-        logger.warn(
-            "Unexpected response or empty token from POPP client. Response was: {}", response);
+        logger.warn("Unexpected response or empty token. Response was: {}", response);
         return "";
       }
     } catch (Exception e) {
@@ -105,7 +110,6 @@ public class VsdService {
     }
   }
 
-  // Typensichere Datenstrukturen (DTOs) für die REST-Kommunikation
   private record TokenRequest(String communicationType, String clientSessionId) {}
 
   private record TokenResponse(String token, String error) {}
