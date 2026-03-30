@@ -66,6 +66,27 @@
       <artifactId>jaxws-rt</artifactId>
       <version>4.0.3</version>
     </dependency>
+    <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>okhttp</artifactId>
+        <version>5.0.0-alpha.14</version> </dependency>
+    <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio-jvm</artifactId>
+        <version>3.9.0</version>
+    </dependency>
+
+    <dependency>
+        <groupId>de.gematik.zeta</groupId>
+        <artifactId>zeta-sdk-jvm</artifactId>
+        <version>0.3.1</version>
+        <exclusions>
+            <exclusion>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-jvm</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
   </dependencies>
 
   <build>

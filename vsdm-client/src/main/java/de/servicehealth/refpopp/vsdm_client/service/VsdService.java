@@ -36,6 +36,7 @@ public class VsdService {
   private static final Logger logger = LoggerFactory.getLogger(VsdService.class);
 
   private final VsdmConverter vsdmConverter;
+  private final Vsdm2Client vsdm2Client;
   private final RestTemplate restTemplate;
 
   @Value("${popp.client.api.url:http://localhost:8081/token}")
@@ -47,11 +48,12 @@ public class VsdService {
   @Value("${popp.client.session-id:123456}")
   private String clientSessionId;
 
-  @Value("${vsdm.mock.url:http://localhost:8082}")
+  @Value("${vsdm.mock.url:https://localhost:8082}")
   private String vsdmMockUrl;
 
-  public VsdService(VsdmConverter vsdmConverter) {
+  public VsdService(VsdmConverter vsdmConverter, Vsdm2Client vsdm2Client) {
     this.vsdmConverter = vsdmConverter;
+    this.vsdm2Client = vsdm2Client;
 
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(5000);
@@ -71,7 +73,8 @@ public class VsdService {
       logger.info("Fetching FHIR bundle for EhcHandle: {}", ehcHandle);
 
       // Step 3: Call the VSDM 2.0 backend (mock) with the PoPP token
-      String fhirBundle = fetchFhirBundle(ehcHandle, poppToken);
+      // String fhirBundle = fetchFhirBundle(ehcHandle, poppToken);
+      String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
 
       // Step 4: Convert FHIR bundle to ReadVSDResponse
       return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
@@ -79,28 +82,6 @@ public class VsdService {
     } catch (Exception e) {
       logger.error("Error processing ReadVSD request", e);
       return new ReadVSDResponse();
-    }
-  }
-
-  private String fetchFhirBundle(String kvnr, String poppToken) {
-    String url = vsdmMockUrl + "/vsdm/bundle/" + kvnr;
-    logger.info("Calling VSDM 2.0 backend at: {}", url);
-
-    try {
-      org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-      headers.set("Authorization", "Bearer " + poppToken);
-      org.springframework.http.HttpEntity<Void> entity =
-          new org.springframework.http.HttpEntity<>(headers);
-
-      org.springframework.http.ResponseEntity<String> response =
-          restTemplate.exchange(url, org.springframework.http.HttpMethod.GET, entity, String.class);
-
-      logger.info("Successfully fetched FHIR bundle for KVNR: {}", kvnr);
-      return response.getBody();
-
-    } catch (Exception e) {
-      logger.error("Failed to fetch FHIR bundle from VSDM backend: {}", e.getMessage());
-      throw e;
     }
   }
 

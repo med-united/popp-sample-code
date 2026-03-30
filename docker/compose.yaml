@@ -55,7 +55,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - VSDM_MOCK_URL=http://vsdm-mock:8082
+      - VSDM_MOCK_URL=https://vsdm-mock:8082
       - POPP_CLIENT_API_URL=http://popp-client:8081/token
     networks:
       - popp-network
