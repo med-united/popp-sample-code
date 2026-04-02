@@ -83,7 +83,7 @@ public class Vsdm2Client {
     zetaSdk =
         ZetaSdk.INSTANCE.build(
             // "https://zeta-cd.westeurope.cloudapp.azure.com",
-            vsdmMockUrl, // Corrected: Use vsdmMockUrl as the base URL for the SDK
+            vsdmMockUrl,
             new BuildConfig(
                 "sample-vsdm-client",
                 "0.4.0",
@@ -95,7 +95,7 @@ public class Vsdm2Client {
                     30,
                     true,
                     new SmbTokenProvider(
-                        new SmbTokenProvider.Credentials( // Use the path to the temporary file
+                        new SmbTokenProvider.Credentials(
                             p12FilePath,
                             "smb-test", // Alias
                             "")), // Password (empty)
@@ -115,14 +115,11 @@ public class Vsdm2Client {
     if (poppToken != null) {
       headers.put(POPP_TOKEN_HEADER_NAME, poppToken);
     }
-    // The VSDM mock currently only provides FHIR bundles in XML format.
+    // The VSDM mock only provides FHIR bundles in XML format.
     headers.put("Accept", MediaType.APPLICATION_XML_VALUE);
 
     log.info("Attempting to fetch FHIR bundle from URL: {}", vsdmRequestUrl);
 
-    // Create an HttpClient instance from the ZetaSdkClient.
-    // This client should be reused if possible, but for this example, we create it per request.
-    // Note: The SDK client itself is not closed here anymore to allow reuse.
     try (ZetaHttpClient httpClient =
         zetaSdk.httpClient(
             it -> {
@@ -130,7 +127,6 @@ public class Vsdm2Client {
               it.disableServerValidation(true);
               return Unit.INSTANCE;
             })) {
-
       response =
           HttpClientExtension.getAsync(httpClient, vsdmRequestUrl, headers)
               .thenCompose(HttpClientExtension::bodyAsText)

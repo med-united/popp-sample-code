@@ -201,6 +201,19 @@
               <packageName>de.gematik.ws.conn.servicedirectory</packageName>
             </configuration>
           </execution>
+          <execution>
+            <id>xjc-fa-vsds</id>
+            <goals>
+              <goal>xjc</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${project.basedir}/src/main/resources/api-telematik-OPB4/fa/vsds</source>
+              </sources>
+              <outputDirectory>${project.basedir}/target/generated-sources</outputDirectory>
+              <clearOutputDir>false</clearOutputDir>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
       <plugin>
