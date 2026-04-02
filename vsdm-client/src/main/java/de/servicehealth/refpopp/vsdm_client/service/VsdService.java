@@ -22,6 +22,7 @@ package de.servicehealth.refpopp.vsdm_client.service;
 
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSDResponse;
+import de.gematik.ws.conn.vsds.vsdservice.v5.VSDStatusType;
 import de.servicehealth.refpopp.vsdm_client.converter.VsdmConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +74,6 @@ public class VsdService {
       logger.info("Fetching FHIR bundle for EhcHandle: {}", ehcHandle);
 
       // Step 3: Call the VSDM 2.0 backend (mock) with the PoPP token
-      // String fhirBundle = fetchFhirBundle(ehcHandle, poppToken);
       String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
 
       // Step 4: Convert FHIR bundle to ReadVSDResponse
@@ -81,7 +81,13 @@ public class VsdService {
 
     } catch (Exception e) {
       logger.error("Error processing ReadVSD request", e);
-      return new ReadVSDResponse();
+
+      // Return a valid fallback response indicating a technical error
+      ReadVSDResponse errorResponse = new ReadVSDResponse();
+      VSDStatusType errorStatus = new VSDStatusType();
+      errorStatus.setStatus("-1"); // Oder ein Gematik-spezifischer Fehlercode
+      errorResponse.setVSDStatus(errorStatus);
+      return errorResponse;
     }
   }
 

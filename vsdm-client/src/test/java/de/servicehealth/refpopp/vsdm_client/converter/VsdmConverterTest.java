@@ -41,7 +41,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 class VsdmConverterTest {
 
   private VsdmConverter converter;
-  private VsdmSoapBuilder soapBuilder;
 
   private static final String VALID_FHIR_XML_SIMPLE =
       """
@@ -69,7 +68,26 @@ class VsdmConverterTest {
           <resource>
             <Coverage>
               <status value="active"/>
+              <payor>
+                <extension url="http://fhir.de/StructureDefinition/gkv/vsdm/VSDMKostentraegerRolle">
+                  <valueCoding>
+                    <code value="H"/>
+                  </valueCoding>
+                </extension>
+                <reference value="Organization/123"/>
+              </payor>
             </Coverage>
+          </resource>
+        </entry>
+        <entry>
+          <resource>
+            <Organization>
+              <id value="123"/>
+              <identifier>
+                <value value="104212059"/>
+              </identifier>
+              <name value="Test Krankenkasse"/>
+            </Organization>
           </resource>
         </entry>
       </Bundle>
@@ -77,8 +95,7 @@ class VsdmConverterTest {
 
   @BeforeEach
   void setUp() {
-    soapBuilder = new VsdmSoapBuilder();
-    converter = new VsdmConverter(new VsdmFhirParser(), soapBuilder);
+    converter = new VsdmConverter(new VsdmFhirParser());
   }
 
   @Test
@@ -127,14 +144,14 @@ class VsdmConverterTest {
               converter.createReadVSDResponse(invalidXml, "test-token");
             });
 
-    assertThat(exception.getMessage()).contains("Error parsing FHIR XML bundle");
+    assertThat(exception.getMessage()).contains("Error parsing");
   }
 
   @Test
   @DisplayName("Should generate and print full SOAP response")
   void createReadVSDResponse_shouldPrintSoapResponse() {
     ReadVSDResponse response = converter.createReadVSDResponse(VALID_FHIR_XML_SIMPLE, "test-token");
-    String soapXml = soapBuilder.marshallToSoapString(response);
+    String soapXml = converter.marshallToSoapString(response);
 
     System.out.println("Generated SOAP Response:");
     System.out.println(soapXml);

@@ -22,178 +22,86 @@ package de.servicehealth.refpopp.vsdm_client.converter;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
-import java.util.HashMap;
 import java.util.Map;
-import org.hl7.fhir.r4.model.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Coverage;
+import org.hl7.fhir.r4.model.Extension;
+import org.hl7.fhir.r4.model.Organization;
+import org.hl7.fhir.r4.model.Patient;
+import org.hl7.fhir.r4.model.Reference;
+import org.hl7.fhir.r4.model.Resource;
 import org.springframework.stereotype.Component;
 
 @Component
 public class VsdmFhirParser {
 
-  private static final Logger LOG = LoggerFactory.getLogger(VsdmFhirParser.class);
   private static final FhirContext FHIR_CONTEXT = FhirContext.forR4();
-
-  // Constants for FHIR Extensions and Codes
-  private static final String EXT_NAMENSZUSATZ = "humanname-namenszusatz";
-  private static final String EXT_OWN_NAME = "humanname-own-name";
-  private static final String EXT_STREET = "iso21090-ADXP-streetName";
-  private static final String EXT_HOUSE_NUMBER = "iso21090-ADXP-houseNumber";
-  private static final String EXT_WOP = "gkv/wop";
-  private static final String EXT_VERSICHERTENART = "gkv/versichertenart";
-  private static final String EXT_PERSONENGRUPPE = "gkv/besondere-personengruppe";
-  private static final String EXT_ZUZAHLUNGSSTATUS = "gkv/zuzahlungsstatus";
-  private static final String EXT_DMP_KENNZEICHNUNG = "gkv/dmp-kennzeichnung";
   private static final String EXT_KOSTENTRAEGER_ROLLE = "VSDMKostentraegerRolle";
   private static final String ROLE_HAUPTKOSTENTRAEGER = "H";
 
-  public VsdmBundle parse(String fhirXmlContent) {
-    LOG.debug("Starting to parse FHIR Bundle XML");
-    VsdmBundle bundle = new VsdmBundle();
+  public record ExtractedVsdmData(Patient patient, Coverage coverage, Organization payor) {}
+
+  public ExtractedVsdmData parseAndExtract(String fhirXmlContent) {
     try {
       IParser parser = FHIR_CONTEXT.newXmlParser();
       Bundle fhirBundle = parser.parseResource(Bundle.class, fhirXmlContent);
 
-      // 1. Index Organizations by ID for lookup (Payor)
+      Patient patient =
+          findResource(fhirBundle, Patient.class)
+              .orElseThrow(
+                  () -> new VsdmProcessingException("Patient resource not found in FHIR bundle"));
+
+      Coverage coverage =
+          findResource(fhirBundle, Coverage.class)
+              .orElseThrow(
+                  () -> new VsdmProcessingException("Coverage resource not found in FHIR bundle"));
+
       Map<String, Organization> orgMap = indexOrganizations(fhirBundle);
 
-      // 2. Process Entries
-      for (Bundle.BundleEntryComponent entry : fhirBundle.getEntry()) {
-        if (entry.getResource() instanceof Patient) {
-          extractPatientData((Patient) entry.getResource(), bundle);
-        } else if (entry.getResource() instanceof Coverage) {
-          extractCoverageData((Coverage) entry.getResource(), bundle, orgMap);
-        }
-      }
+      Organization payor =
+          findPayor(coverage, orgMap)
+              .orElseThrow(
+                  () ->
+                      new VsdmProcessingException(
+                          "Payor (Hauptkostenträger) not found in FHIR bundle"));
 
-      LOG.info("Successfully parsed FHIR Bundle for KVNR: {}", bundle.getKvnr());
-      return bundle;
-
+      return new ExtractedVsdmData(patient, coverage, payor);
     } catch (Exception e) {
-      throw new VsdmProcessingException("Error parsing FHIR XML bundle", e);
+      throw new VsdmProcessingException("Error parsing or extracting FHIR XML bundle", e);
     }
+  }
+
+  private <T extends Resource> Optional<T> findResource(Bundle bundle, Class<T> resourceType) {
+    return bundle.getEntry().stream()
+        .map(Bundle.BundleEntryComponent::getResource)
+        .filter(resourceType::isInstance)
+        .map(resourceType::cast)
+        .findFirst();
   }
 
   private Map<String, Organization> indexOrganizations(Bundle fhirBundle) {
-    Map<String, Organization> orgMap = new HashMap<>();
-    for (Bundle.BundleEntryComponent entry : fhirBundle.getEntry()) {
-      if (entry.getResource() instanceof Organization) {
-        Organization org = (Organization) entry.getResource();
-        if (org.getIdElement() != null) {
-          orgMap.put(org.getIdElement().getIdPart(), org);
-        }
-      }
-    }
-    return orgMap;
+    return fhirBundle.getEntry().stream()
+        .map(Bundle.BundleEntryComponent::getResource)
+        .filter(Organization.class::isInstance)
+        .map(Organization.class::cast)
+        .collect(Collectors.toMap(org -> org.getIdElement().getIdPart(), Function.identity()));
   }
 
-  private void extractPatientData(Patient p, VsdmBundle bundle) {
-    if (p.hasIdentifier()) {
-      bundle.setKvnr(p.getIdentifierFirstRep().getValue());
-    }
-
-    if (p.hasName()) {
-      HumanName name = p.getNameFirstRep();
-      bundle.setVorname(name.getGivenAsSingleString());
-
-      if (name.hasFamilyElement()) {
-        StringType family = name.getFamilyElement();
-        String ownName = "";
-        String nameZusatz = "";
-
-        for (Extension ext : family.getExtension()) {
-          String url = ext.getUrl();
-          if (url.endsWith(EXT_NAMENSZUSATZ) && ext.getValue() instanceof StringType) {
-            nameZusatz = ((StringType) ext.getValue()).getValue();
-          } else if (url.endsWith(EXT_OWN_NAME) && ext.getValue() instanceof StringType) {
-            ownName = ((StringType) ext.getValue()).getValue();
-          }
-        }
-        bundle.setNachname(!ownName.isEmpty() ? ownName : family.getValue());
-        bundle.setNamenszusatz(nameZusatz);
-      }
-    }
-
-    if (p.hasGender()) {
-      String g = p.getGender().toCode();
-      if ("male".equalsIgnoreCase(g)) bundle.setGeschlecht("M");
-      else if ("female".equalsIgnoreCase(g)) bundle.setGeschlecht("W");
-      else bundle.setGeschlecht("X");
-    }
-
-    if (p.hasBirthDateElement()) {
-      bundle.setGeburtsdatum(p.getBirthDateElement().getValueAsString().replace("-", ""));
-    }
-
-    if (p.hasAddress()) {
-      Address addr = p.getAddressFirstRep();
-      bundle.setOrt(addr.getCity());
-      bundle.setPlz(addr.getPostalCode());
-      if (addr.hasCountry()) {
-        bundle.setWohnsitzlaendercode(addr.getCountry());
-      }
-
-      if (addr.hasLine()) {
-        for (StringType line : addr.getLine()) {
-          for (Extension ext : line.getExtension()) {
-            String url = ext.getUrl();
-            if (url.endsWith(EXT_STREET) && ext.getValue() instanceof StringType) {
-              bundle.setStrasse(((StringType) ext.getValue()).getValue());
-            } else if (url.endsWith(EXT_HOUSE_NUMBER) && ext.getValue() instanceof StringType) {
-              bundle.setHausnummer(((StringType) ext.getValue()).getValue());
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private void extractCoverageData(
-      Coverage c, VsdmBundle bundle, Map<String, Organization> orgMap) {
-    for (Extension ext : c.getExtension()) {
-      String url = ext.getUrl();
-      if (ext.getValue() instanceof Coding) {
-        String code = ((Coding) ext.getValue()).getCode();
-        if (url.endsWith(EXT_WOP)) bundle.setWop(code);
-        else if (url.endsWith(EXT_VERSICHERTENART)) bundle.setVersichertenStatus(code);
-        else if (url.endsWith(EXT_PERSONENGRUPPE)) bundle.setBesonderePersonengruppe(code);
-        else if (url.endsWith(EXT_ZUZAHLUNGSSTATUS)) bundle.setZuzahlungsstatus(code);
-        else if (url.endsWith(EXT_DMP_KENNZEICHNUNG)) bundle.setDmpKennzeichnung(code);
-      }
-    }
-
-    if (c.hasPeriod()) {
-      if (c.getPeriod().hasStart())
-        bundle.setVersicherungsschutzBeginn(
-            c.getPeriod().getStartElement().getValueAsString().replace("-", ""));
-      if (c.getPeriod().hasEnd())
-        bundle.setVersicherungsschutzEnde(
-            c.getPeriod().getEndElement().getValueAsString().replace("-", ""));
-    }
-
-    for (Reference ref : c.getPayor()) {
-      boolean isHaupt = false;
+  private Optional<Organization> findPayor(Coverage coverage, Map<String, Organization> orgMap) {
+    for (Reference ref : coverage.getPayor()) {
       for (Extension ext : ref.getExtension()) {
-        if (ext.getUrl().endsWith(EXT_KOSTENTRAEGER_ROLLE) && ext.getValue() instanceof Coding) {
-          if (ROLE_HAUPTKOSTENTRAEGER.equals(((Coding) ext.getValue()).getCode())) {
-            isHaupt = true;
-            break;
+        if (ext.getUrl().endsWith(EXT_KOSTENTRAEGER_ROLLE)
+            && ext.getValue() instanceof Coding coding) {
+          if (ROLE_HAUPTKOSTENTRAEGER.equals(coding.getCode()) && ref.hasReference()) {
+            return Optional.ofNullable(orgMap.get(ref.getReferenceElement().getIdPart()));
           }
         }
-      }
-
-      if (isHaupt && ref.hasReference()) {
-        String refId = ref.getReferenceElement().getIdPart();
-        Organization org = orgMap.get(refId);
-        if (org != null) {
-          bundle.setKostentraegerName(org.getName());
-          if (org.hasIdentifier()) {
-            bundle.setKostentraegerKennung(org.getIdentifierFirstRep().getValue());
-          }
-        }
-        break;
       }
     }
+    return Optional.empty();
   }
 }
