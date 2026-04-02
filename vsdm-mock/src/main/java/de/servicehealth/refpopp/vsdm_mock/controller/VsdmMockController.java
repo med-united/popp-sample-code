@@ -18,7 +18,7 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
-package de.servicehealth.refpopp.vsdm_mock;
+package de.servicehealth.refpopp.vsdm_mock.controller;
 
 import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
@@ -33,14 +33,14 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/vsdm")
 public class VsdmMockController {
 
-  private static final Logger logger = LoggerFactory.getLogger(VsdmMockController.class);
+  private static final Logger log = LoggerFactory.getLogger(VsdmMockController.class);
 
   @GetMapping(value = "/bundle/{kvnr}", produces = MediaType.APPLICATION_XML_VALUE)
   public ResponseEntity<String> getFhirBundle(
       @PathVariable String kvnr,
       @RequestHeader(value = "Authorization", required = false) String authorization) {
 
-    logger.info("Mock VSDM 2.0 backend called for KVNR: {} with token: {}", kvnr, authorization);
+    log.info("Mock VSDM 2.0 backend called for KVNR: {} with token: {}", kvnr, authorization);
 
     try {
       ClassPathResource resource =
@@ -48,7 +48,7 @@ public class VsdmMockController {
       byte[] data = FileCopyUtils.copyToByteArray(resource.getInputStream());
       return ResponseEntity.ok(new String(data, StandardCharsets.UTF_8));
     } catch (Exception e) {
-      logger.error("Error reading FHIR bundle from resources", e);
+      log.error("Error reading FHIR bundle from resources", e);
       return ResponseEntity.internalServerError().build();
     }
   }

@@ -26,22 +26,21 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class WellKnownController {
 
-  private static final Logger logger = LoggerFactory.getLogger(WellKnownController.class);
+  private static final Logger log = LoggerFactory.getLogger(WellKnownController.class);
 
   @GetMapping(
       value = "/.well-known/oauth-protected-resource",
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> getOAuthProtectedResource() {
-    logger.info("Mock VSDM 2.0 backend called for /.well-known/oauth-protected-resource");
+    log.info("Mock VSDM 2.0 backend called for /.well-known/oauth-protected-resource");
 
-    // Diese Metadaten sind notwendig, damit die Zeta SDK die Anforderungen des Servers
-    // (unseres Mocks) versteht. Insbesondere die "audience" muss mit der Konfiguration
-    // im Vsdm2Client übereinstimmen.
+    // This endpoint provides metadata about the protected resource (VSDM 2.0 backend).
     String metadata =
         """
         {
@@ -72,7 +71,7 @@ public class WellKnownController {
       value = "/.well-known/oauth-authorization-server",
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> getOAuthAuthorizationServer() {
-    logger.info("Mock VSDM 2.0 backend called for /.well-known/oauth-authorization-server");
+    log.info("Mock VSDM 2.0 backend called for /.well-known/oauth-authorization-server");
 
     // Minimal OAuth 2.0 Authorization Server Metadata
     String metadata =
@@ -111,7 +110,7 @@ public class WellKnownController {
 
   @GetMapping(value = "/oauth2/op", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> getOpenIdProviders() {
-    logger.info("Mock VSDM 2.0 backend called for /oauth2/op");
+    log.info("Mock VSDM 2.0 backend called for /oauth2/op");
     // As per OpenID Connect Discovery, this endpoint typically returns a list of OpenID Provider
     // configurations.
     // For a mock, an empty array is a valid and minimal JSON response.
@@ -121,12 +120,11 @@ public class WellKnownController {
 
   @GetMapping(value = "/oauth2/nonce", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> getNonce() {
-    logger.info("Mock VSDM 2.0 backend called for /oauth2/nonce");
+    log.info("Mock VSDM 2.0 backend called for /oauth2/nonce");
     // In a real scenario, this would generate a cryptographically secure random nonce.
-    // The zeta-sdk expects a plain Base64 encoded string here, not a JSON object.
     // "mock-nonce-1234567890" Base64 encoded is "bW9jay1ub25jZS0xMjM0NTY3ODkw"
     String base64EncodedNonce = "bW9jay1ub25jZS0xMjM0NTY3ODkw";
-    // Return as plain text, not application/json, as it's a raw Base64 string.
+
     return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(base64EncodedNonce);
   }
 
@@ -134,9 +132,8 @@ public class WellKnownController {
       value = "/oauth2/op",
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
-  public ResponseEntity<String> registerClient(
-      @org.springframework.web.bind.annotation.RequestBody String requestBody) {
-    logger.info("Mock VSDM 2.0 backend called for POST /oauth2/op with body: {}", requestBody);
+  public ResponseEntity<String> registerClient(@RequestBody String requestBody) {
+    log.info("Mock VSDM 2.0 backend called for POST /oauth2/op with body: {}", requestBody);
 
     // For a mock, we return a fixed client_id and echo back some of the requested parameters.
     // In a real implementation, a unique client_id would be generated and client details stored.
@@ -171,13 +168,9 @@ public class WellKnownController {
       value = "/oauth2/token",
       consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
-  public ResponseEntity<String> postOAuthToken(
-      @org.springframework.web.bind.annotation.RequestBody String requestBody) {
-    logger.info("Mock VSDM 2.0 backend called for POST /oauth2/token with body: {}", requestBody);
+  public ResponseEntity<String> postOAuthToken(@RequestBody String requestBody) {
+    log.info("Mock VSDM 2.0 backend called for POST /oauth2/token with body: {}", requestBody);
 
-    // This mock endpoint simulates a token exchange.
-    // In a real scenario, the 'requestBody' would be parsed to validate
-    // parameters like 'grant_type', 'client_assertion', 'subject_token', etc.
     // For this mock, we return a fixed, plausible token response.
     String response =
         """
