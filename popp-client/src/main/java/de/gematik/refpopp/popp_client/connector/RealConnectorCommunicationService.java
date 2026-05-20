@@ -66,6 +66,10 @@ public class RealConnectorCommunicationService {
     return stopCardSessionClient.performStopCardSession(uuidSessionId);
   }
 
+  public String getSmcbCardHandle() {
+    return getCardsClient.performGetSmcbCardHandle();
+  }
+
   public List<String> secureSendApdu(final String signedScenario) {
     return secureSendAPDUClient.performSecureSendAPDU(signedScenario);
   }

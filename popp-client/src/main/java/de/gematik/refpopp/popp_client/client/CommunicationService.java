@@ -21,7 +21,13 @@
 package de.gematik.refpopp.popp_client.client;
 
 import de.gematik.poppcommons.api.enums.CardConnectionType;
-import de.gematik.poppcommons.api.messages.*;
+import de.gematik.poppcommons.api.messages.ConnectorScenarioMessage;
+import de.gematik.poppcommons.api.messages.ErrorMessage;
+import de.gematik.poppcommons.api.messages.PoPPMessage;
+import de.gematik.poppcommons.api.messages.ScenarioResponseMessage;
+import de.gematik.poppcommons.api.messages.StandardScenarioMessage;
+import de.gematik.poppcommons.api.messages.StartMessage;
+import de.gematik.poppcommons.api.messages.TokenMessage;
 import de.gematik.refpopp.popp_client.cardreader.card.CardCommunicationService;
 import de.gematik.refpopp.popp_client.cardreader.card.VirtualCardService;
 import de.gematik.refpopp.popp_client.client.events.CommunicationEvent;
@@ -34,7 +40,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -321,12 +331,17 @@ public class CommunicationService {
 
   private String resolveSessionId(
       final String sessionUUID, final CardConnectionType cardConnectionType) {
+    final var sessionUUIDExists = sessionUUID != null && !sessionUUID.isEmpty();
+
+    if (sessionUUIDExists){
+      return sessionUUID;
+    }
+
     if (usesConnectorSession(cardConnectionType)) {
       return connectorCommunicationServiceWrapper.startCardSession(
           connectorCommunicationServiceWrapper.getConnectedEgkCard());
     }
-    final var sessionUUIDExists = sessionUUID != null && !sessionUUID.isEmpty();
-    return sessionUUIDExists ? sessionUUID : UUID.randomUUID().toString();
+    return UUID.randomUUID().toString();
   }
 
   private boolean usesConnectorSession(final CardConnectionType cardConnectionType) {
