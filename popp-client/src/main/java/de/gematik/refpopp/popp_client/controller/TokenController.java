@@ -36,7 +36,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/token")
@@ -139,6 +142,7 @@ public class TokenController {
   public ResponseEntity<PoppClientResponse> createToken(
       @Valid @RequestBody PoppClientRequest request) {
     String clientSessionId = request.clientSessionId();
+    String cardId = request.cardId();
     log.info(
         "| Started 'generate PoPP Token' with clientSessionId '{}' and communicationType" + " '{}'",
         clientSessionId,
@@ -147,7 +151,7 @@ public class TokenController {
       if (request.communicationType().requiresCardReader()) {
         cardReaderService.startCheckForCardReader();
       }
-      String token = startCommunication(request.communicationType(), clientSessionId);
+      String token = startCommunication(request.communicationType(), clientSessionId, cardId);
       log.info("| Finished 'generate PoPP Token' successfully");
       return ResponseEntity.ok(PoppClientResponse.ok(token));
     } catch (UnsupportedOperationException e) {
@@ -163,12 +167,12 @@ public class TokenController {
     }
   }
 
-  private String startCommunication(CardConnectionType type, String clientSessionId) {
+  private String startCommunication(CardConnectionType type, String clientSessionId, String cardId) {
     return switch (type) {
       case CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL ->
           communicationService.startConnectorMock(clientSessionId);
       case CONTACT_STANDARD, CONTACTLESS_STANDARD, CONTACT_CONNECTOR, CONTACTLESS_CONNECTOR ->
-          communicationService.start(type, clientSessionId);
+          communicationService.start(type, clientSessionId, cardId);
       case CONTACT_VIRTUAL ->
           communicationService.startVirtualCard(
               CardConnectionType.CONTACT_STANDARD, clientSessionId);

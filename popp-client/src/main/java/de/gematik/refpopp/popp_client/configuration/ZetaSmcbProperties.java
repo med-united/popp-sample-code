@@ -1,4 +1,3 @@
-
 /*
  * Copyright (Date see Readme), gematik GmbH
  *

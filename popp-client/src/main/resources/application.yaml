@@ -14,6 +14,7 @@ connector:
   end-point-url: ${CONNECTOR_END_POINT_URL:https://127.0.0.1}
   proxy-port: ${CONNECTOR_PROXY_PORT:8780}
   log-ws: true
+  real-connector-event-service-version: ${CONNECTOR_EVENT_SERVICE_VERSION:}
   secure:
     enable: ${CONNECTOR_SECURE_ENABLE:true}
     hostname-validation: ${CONNECTOR_SECURE_HOSTNAME_VALIDATION:false}
