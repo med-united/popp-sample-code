@@ -40,26 +40,30 @@ public class ServicePathExtractor {
   private static final String CARD_SERVICE_NAME = "CardService";
   @Getter private final String connectorUrl;
   private final boolean isSecureConnectionEnabled;
+
   /**
-   * Out virtual connector (popp-smartphone-connector) has to provide two different versions
-   * of EventService in its service discovery document.
-   * One version is being used by the primary service. This version points to the service implemented by
-   * the virtual connector itself where getCards will return the egks connected via cardlink websocket.
+   * Out virtual connector (popp-smartphone-connector) has to provide two different versions of
+   * EventService in its service discovery document. One version is being used by the primary
+   * service. This version points to the service implemented by the virtual connector itself where
+   * getCards will return the egks connected via cardlink websocket.
    *
-   * One version is used by the popp client (i.e. this app). That version points has a location pointed
-   * at the real connector proxy implemented by the virtual connector. The proxy just passes requests on to the
-   * real hardware connector. This way the popp client can retrieve the real smc-bs from the real connector.
+   * <p>One version is used by the popp client (i.e. this app). That version points has a location
+   * pointed at the real connector proxy implemented by the virtual connector. The proxy just passes
+   * requests on to the real hardware connector. This way the popp client can retrieve the real
+   * smc-bs from the real connector.
    *
-   * This is a bit of a hack. The versions are just used to distinguish between a service implemented by the virtual
-   * connector itself and the proxy that just forwards requests.
+   * <p>This is a bit of a hack. The versions are just used to distinguish between a service
+   * implemented by the virtual connector itself and the proxy that just forwards requests.
    */
   private final String realConnectorEventServiceVersion;
+
   private final ConnectorServicesFactory connectorServicesFactory;
 
   public ServicePathExtractor(
       @Value("${connector.end-point-url}") final String connectorUrl,
       @Value("${connector.secure.enable:false}") final boolean isSecureConnectionEnabled,
-      @Value("${connector.real-connector-event-service-version:}") final String realConnectorEventServiceVersion,
+      @Value("${connector.real-connector-event-service-version:}")
+          final String realConnectorEventServiceVersion,
       final ConnectorServicesFactory connectorServicesFactory) {
     this.connectorUrl = connectorUrl;
     this.isSecureConnectionEnabled = isSecureConnectionEnabled;
@@ -85,17 +89,17 @@ public class ServicePathExtractor {
     }
     VersionType versionType = null;
 
-    if(!Objects.isNull(version) && !version.isEmpty()){
-      var serviceOfVersion = serviceVersions.stream().filter(v -> v.getVersion().equals(version)).findFirst();
-      if(serviceOfVersion.isPresent()){
-      versionType = serviceOfVersion.get();
-     }
+    if (!Objects.isNull(version) && !version.isEmpty()) {
+      var serviceOfVersion =
+          serviceVersions.stream().filter(v -> v.getVersion().equals(version)).findFirst();
+      if (serviceOfVersion.isPresent()) {
+        versionType = serviceOfVersion.get();
+      }
     }
 
-    if(versionType == null){
+    if (versionType == null) {
       versionType = getLatestVersion(serviceVersions);
     }
-
 
     final String location = getLocation(versionType);
     final String endpointPath = getPath(location);

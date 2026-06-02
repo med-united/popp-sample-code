@@ -76,7 +76,14 @@ public class CommunicationService {
   @Value("${popp-client.token-wait-timeout-seconds:5}")
   private int tokenWaitTimeoutSeconds;
 
-  public String start(final CardConnectionType cardConnectionType, final String clientSessionId, final String cardId) {
+  public String start(final CardConnectionType cardConnectionType, final String clientSessionId) {
+    return start(cardConnectionType, clientSessionId, null);
+  }
+
+  public String start(
+      final CardConnectionType cardConnectionType,
+      final String clientSessionId,
+      final String cardId) {
     final var sessionId = resolveSessionId(clientSessionId, cardConnectionType);
     CompletableFuture<String> tokenFuture = new CompletableFuture<>();
     tokenQueue.put(sessionId, tokenFuture);
@@ -101,7 +108,9 @@ public class CommunicationService {
   }
 
   private void executeStart(
-      final CardConnectionType cardConnectionType, final String clientSessionId, final String cardId) {
+      final CardConnectionType cardConnectionType,
+      final String clientSessionId,
+      final String cardId) {
     clientServerCommunicationService.connect(cardId);
     final Map<String, Object> sslSession = clientServerCommunicationService.getSSLSession();
     sslSession.put(CARD_CONNECTION_TYPE, cardConnectionType);

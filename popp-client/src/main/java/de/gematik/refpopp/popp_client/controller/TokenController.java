@@ -167,7 +167,8 @@ public class TokenController {
     }
   }
 
-  private String startCommunication(CardConnectionType type, String clientSessionId, String cardId) {
+  private String startCommunication(
+      CardConnectionType type, String clientSessionId, String cardId) {
     return switch (type) {
       case CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL ->
           communicationService.startConnectorMock(clientSessionId);

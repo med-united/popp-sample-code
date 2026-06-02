@@ -20,6 +20,8 @@
 
 package de.gematik.refpopp.popp_client.connector.eventservice;
 
+import static de.gematik.refpopp.popp_client.configuration.helper.SoapActionVersionHelper.buildSoapAction;
+
 import de.gematik.refpopp.popp_client.connector.Context;
 import de.gematik.refpopp.popp_client.connector.soap.ServiceEndpointProvider;
 import de.gematik.refpopp.popp_client.connector.soap.SoapActions;
@@ -38,8 +40,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.stereotype.Component;
-
-import static de.gematik.refpopp.popp_client.configuration.helper.SoapActionVersionHelper.buildSoapAction;
 
 /** Sends a <i>GetCards</i> request to the connector. */
 @Component
@@ -90,7 +90,7 @@ public class GetCardsClient extends SoapClient {
         sendRequest(soapRequest, endpoint, GetCardsResponse.class);
 
     return soapResponse.getCards().getCard().stream()
-        .filter(smcb-> cardId == null || smcb.getIccsn().equals(cardId))
+        .filter(smcb -> cardId == null || smcb.getIccsn().equals(cardId))
         .map(CardInfoType::getCardHandle)
         .findFirst()
         .orElseThrow(() -> new IllegalStateException("No SMC-B card found"));
