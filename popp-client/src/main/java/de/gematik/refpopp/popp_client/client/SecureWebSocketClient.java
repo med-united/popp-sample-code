@@ -129,23 +129,29 @@ public class SecureWebSocketClient {
     this.wsClientWrapper = wsClientWrapper;
     this.zetaSdkCache = new ConcurrentHashMap<>();
 
-    this.zetaSdkGenerator = (String cardId) -> ZetaSdk.INSTANCE.build(
-        serverUri.toString(),
-        new BuildConfig(
-            "demo-client",
-            "0.2.0",
-            "sdk-client",
-            new StorageConfig(
-                new InMemoryStorage(), "7aae7xXr8rnzVqjpYbosS0CFMrlprkD7jbVotm0fd+w="),
-            new TpmConfig() {},
-            new AuthConfig(
-                List.of("popp"), 30L, true, getTokenProvider(cardId), AttestationConfig.software()),
-            createPlatformProductId(),
-            new ZetaHttpClientBuilder("")
-                .disableServerValidation(disableServerValidation)
-                .logging(LogLevel.ALL, message -> log.info("Ktor HttpClient: {}", message)),
-            null,
-            null));
+    this.zetaSdkGenerator =
+        (String cardId) ->
+            ZetaSdk.INSTANCE.build(
+                serverUri.toString(),
+                new BuildConfig(
+                    "demo-client",
+                    "0.2.0",
+                    "sdk-client",
+                    new StorageConfig(
+                        new InMemoryStorage(), "7aae7xXr8rnzVqjpYbosS0CFMrlprkD7jbVotm0fd+w="),
+                    new TpmConfig() {},
+                    new AuthConfig(
+                        List.of("popp"),
+                        30L,
+                        true,
+                        getTokenProvider(cardId),
+                        AttestationConfig.software()),
+                    createPlatformProductId(),
+                    new ZetaHttpClientBuilder("")
+                        .disableServerValidation(disableServerValidation)
+                        .logging(LogLevel.ALL, message -> log.info("Ktor HttpClient: {}", message)),
+                    null,
+                    null));
     this.defaultZetaSdk = this.zetaSdkGenerator.apply(null);
   }
 
@@ -254,10 +260,19 @@ public class SecureWebSocketClient {
     return session.get() != null;
   }
 
+  public void connectBlocking() {
+    connectBlocking(null);
+  }
+
   public void connectBlocking(String cardId) {
-    var zetaSdk = cardId == null ? defaultZetaSdk : zetaSdkCache.computeIfAbsent(cardId, (key) -> this.zetaSdkGenerator.apply(cardId));
+    var zetaSdk =
+        cardId == null
+            ? defaultZetaSdk
+            : zetaSdkCache.computeIfAbsent(cardId, (key) -> this.zetaSdkGenerator.apply(cardId));
+    final AtomicReference<Throwable> connectionError = new AtomicReference<>();
     pool.submit(
-        () ->
+        () -> {
+          try {
             wsClientWrapper.ws(
                 zetaSdk,
                 this.serverUri.toString(),
@@ -273,7 +288,8 @@ public class SecureWebSocketClient {
 
                   while (true) {
                     WsClientExtension.WsMessage incoming = session.receiveNext();
-                    if (incoming == null || incoming instanceof WsClientExtension.WsMessage.Close) {
+                    if (incoming == null
+                        || incoming instanceof WsClientExtension.WsMessage.Close) {
                       log.debug("WebSocket closed.");
                       break;
                     }
@@ -281,19 +297,31 @@ public class SecureWebSocketClient {
                       log.debug("WebSocket received: {}", text.getText());
                       onMessage(text.getText());
                     } else if (incoming instanceof WsClientExtension.WsMessage.Binary bin) {
-                      log.debug("WebSocket received binary (bytes): {}", bin.getBytes().length);
+                      log.debug(
+                          "WebSocket received binary (bytes): {}", bin.getBytes().length);
                     }
                   }
-                }));
+                });
+          } catch (final Throwable t) {
+            log.error("Zeta SDK WebSocket connection failed: {}", t.getMessage(), t);
+            connectionError.set(t);
+            sessionReady.countDown();
+          }
+        });
 
     try {
-      if (!sessionReady.await(10, TimeUnit.SECONDS)) {
+      if (!sessionReady.await(20, TimeUnit.SECONDS)) {
         throw new RuntimeException("Connection timeout");
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(
           "Thread was interrupted while waiting for WebSocket connection", e);
+    }
+
+    final Throwable error = connectionError.get();
+    if (error != null) {
+      throw new RuntimeException("WebSocket connection failed: " + error.getMessage(), error);
     }
   }
 
