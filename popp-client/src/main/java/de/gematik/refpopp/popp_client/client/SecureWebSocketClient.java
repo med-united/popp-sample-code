@@ -25,6 +25,9 @@ import de.gematik.refpopp.popp_client.client.events.WebSocketCommunicationErrorE
 import de.gematik.refpopp.popp_client.client.events.WebSocketConnectionClosedEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketConnectionOpenedEvent;
 import de.gematik.refpopp.popp_client.configuration.PathResolver;
+import de.gematik.refpopp.popp_client.configuration.ZetaSmcbProperties;
+import de.gematik.refpopp.popp_client.connector.ConnectorCommunicationServiceWrapper;
+import de.gematik.refpopp.popp_client.connector.Context;
 import de.gematik.zeta.sdk.BuildConfig;
 import de.gematik.zeta.sdk.StorageConfig;
 import de.gematik.zeta.sdk.TpmConfig;
@@ -36,6 +39,8 @@ import de.gematik.zeta.sdk.attestation.model.PlatformProductId;
 import de.gematik.zeta.sdk.authentication.AuthConfig;
 import de.gematik.zeta.sdk.authentication.SubjectTokenProvider;
 import de.gematik.zeta.sdk.authentication.smb.SmbTokenProvider;
+import de.gematik.zeta.sdk.authentication.smcb.ConnectorApiImpl;
+import de.gematik.zeta.sdk.authentication.smcb.SmcbTokenProvider;
 import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
 import de.gematik.zeta.sdk.storage.InMemoryStorage;
 import io.ktor.client.plugins.logging.LogLevel;
@@ -47,11 +52,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import kotlin.Unit;
 import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.handshake.ServerHandshake;
@@ -70,29 +77,49 @@ public class SecureWebSocketClient {
   static final String PLATFORM_PRODUCT_VERSION = "latest";
 
   private final CommunicationEventPublisher eventPublisher;
+  private final ZetaSmcbProperties zetaSmcbProperties;
+  private final ConnectorCommunicationServiceWrapper connectorCommunicationServiceWrapper;
+  private final String connectorEndPointUrl;
+  private final boolean useConnectorForSignature;
+  private final int connectorProxyPort;
+  private final Context connectorContext;
   private final Path keyfile;
   private final String alias;
   private final String password;
   private final boolean disableServerValidation;
   private final URI serverUri;
-  private final ZetaSdkClient zetaSdk;
   private final ExecutorService pool;
   private final CountDownLatch sessionReady = new CountDownLatch(1);
   private final AtomicReference<WsClientExtension.WsSession> session = new AtomicReference<>();
   private final Map<String, Object> sessionMetadata;
   private final WsClientWrapper wsClientWrapper;
+  private final Function<String, ZetaSdkClient> zetaSdkGenerator;
+  private final ConcurrentHashMap<String, ZetaSdkClient> zetaSdkCache;
+  private final ZetaSdkClient defaultZetaSdk;
 
   @Autowired
   public SecureWebSocketClient(
       @Value("${popp-server.url}") final URI serverUri,
       final CommunicationEventPublisher eventPublisher,
+      ZetaSmcbProperties zetaSmcbProperties,
+      final ConnectorCommunicationServiceWrapper connectorCommunicationServiceWrapper,
       @Value("${zeta.authentication.smb.keyfile}") final String keyfile,
       @Value("${zeta.authentication.smb.alias}") final String alias,
       @Value("${zeta.authentication.smb.password}") final String password,
       @Value("${zeta.client.disableServerValidation}") final boolean disableServerValidation,
+      @Value("${connector.end-point-url}") final String connectorEndPointUrl,
+      @Value("${connector.use-for-signature}") final boolean useConnectorForSignature,
+      @Value("${connector.proxy-port}") final int connectorProxyPort,
+      final Context connectorContext,
       final WsClientWrapper wsClientWrapper) {
     this.serverUri = serverUri;
     this.eventPublisher = eventPublisher;
+    this.zetaSmcbProperties = zetaSmcbProperties;
+    this.connectorCommunicationServiceWrapper = connectorCommunicationServiceWrapper;
+    this.connectorEndPointUrl = connectorEndPointUrl;
+    this.useConnectorForSignature = useConnectorForSignature;
+    this.connectorProxyPort = connectorProxyPort;
+    this.connectorContext = connectorContext;
     this.pool = Executors.newFixedThreadPool(1);
     this.sessionMetadata = new HashMap<>();
     this.keyfile = PathResolver.resolveAgainstWorkingDirectoryAncestors(keyfile);
@@ -100,24 +127,32 @@ public class SecureWebSocketClient {
     this.password = password;
     this.disableServerValidation = disableServerValidation;
     this.wsClientWrapper = wsClientWrapper;
-    this.zetaSdk =
-        ZetaSdk.INSTANCE.build(
-            serverUri.toString(),
-            new BuildConfig(
-                "demo-client",
-                "0.2.0",
-                "sdk-client",
-                new StorageConfig(
-                    new InMemoryStorage(), "7aae7xXr8rnzVqjpYbosS0CFMrlprkD7jbVotm0fd+w="),
-                new TpmConfig() {},
-                new AuthConfig(
-                    List.of("popp"), 30L, true, getTokenProvider(), AttestationConfig.software()),
-                createPlatformProductId(),
-                new ZetaHttpClientBuilder("")
-                    .disableServerValidation(disableServerValidation)
-                    .logging(LogLevel.ALL, message -> log.info("Ktor HttpClient: {}", message)),
-                null,
-                null));
+    this.zetaSdkCache = new ConcurrentHashMap<>();
+
+    this.zetaSdkGenerator =
+        (String cardId) ->
+            ZetaSdk.INSTANCE.build(
+                serverUri.toString(),
+                new BuildConfig(
+                    "demo-client",
+                    "0.2.0",
+                    "sdk-client",
+                    new StorageConfig(
+                        new InMemoryStorage(), "7aae7xXr8rnzVqjpYbosS0CFMrlprkD7jbVotm0fd+w="),
+                    new TpmConfig() {},
+                    new AuthConfig(
+                        List.of("popp"),
+                        30L,
+                        true,
+                        getTokenProvider(cardId),
+                        AttestationConfig.software()),
+                    createPlatformProductId(),
+                    new ZetaHttpClientBuilder("")
+                        .disableServerValidation(disableServerValidation)
+                        .logging(LogLevel.ALL, message -> log.info("Ktor HttpClient: {}", message)),
+                    null,
+                    null));
+    this.defaultZetaSdk = this.zetaSdkGenerator.apply(null);
   }
 
   static PlatformProductId createPlatformProductId() {
@@ -150,7 +185,32 @@ public class SecureWebSocketClient {
         "Unsupported operating system for ZETA platform product id: " + osName);
   }
 
-  private SubjectTokenProvider getTokenProvider() {
+  private SubjectTokenProvider getTokenProvider(String cardId) {
+
+    if (useConnectorForSignature) {
+      return getRealSmcbTokenProvider(cardId);
+    }
+
+    return getFileTokenProvider();
+  }
+
+  private SmcbTokenProvider getRealSmcbTokenProvider(String cardId) {
+    final String host = URI.create(connectorEndPointUrl).getHost();
+    final String connectorUrl = "http://" + host + ":" + connectorProxyPort;
+    final String smcbCardHandle = connectorCommunicationServiceWrapper.getSmcbCardHandle(cardId);
+
+    final SmcbTokenProvider.ConnectorConfig config =
+        new SmcbTokenProvider.ConnectorConfig(
+            connectorUrl,
+            connectorContext.getMandantId(),
+            connectorContext.getClientSystemId(),
+            connectorContext.getWorkplaceId(),
+            connectorContext.getUserId() != null ? connectorContext.getUserId() : "",
+            smcbCardHandle);
+    return new SmcbTokenProvider(config, new ConnectorApiImpl(config));
+  }
+
+  private SmbTokenProvider getFileTokenProvider() {
     if (!Files.isReadable(keyfile)) {
       throw new IllegalStateException("Can't read private key: " + keyfile);
     }
@@ -201,8 +261,18 @@ public class SecureWebSocketClient {
   }
 
   public void connectBlocking() {
+    connectBlocking(null);
+  }
+
+  public void connectBlocking(String cardId) {
+    var zetaSdk =
+        cardId == null
+            ? defaultZetaSdk
+            : zetaSdkCache.computeIfAbsent(cardId, (key) -> this.zetaSdkGenerator.apply(cardId));
+    final AtomicReference<Throwable> connectionError = new AtomicReference<>();
     pool.submit(
-        () ->
+        () -> {
+          try {
             wsClientWrapper.ws(
                 zetaSdk,
                 this.serverUri.toString(),
@@ -218,7 +288,8 @@ public class SecureWebSocketClient {
 
                   while (true) {
                     WsClientExtension.WsMessage incoming = session.receiveNext();
-                    if (incoming == null || incoming instanceof WsClientExtension.WsMessage.Close) {
+                    if (incoming == null
+                        || incoming instanceof WsClientExtension.WsMessage.Close) {
                       log.debug("WebSocket closed.");
                       break;
                     }
@@ -226,19 +297,31 @@ public class SecureWebSocketClient {
                       log.debug("WebSocket received: {}", text.getText());
                       onMessage(text.getText());
                     } else if (incoming instanceof WsClientExtension.WsMessage.Binary bin) {
-                      log.debug("WebSocket received binary (bytes): {}", bin.getBytes().length);
+                      log.debug(
+                          "WebSocket received binary (bytes): {}", bin.getBytes().length);
                     }
                   }
-                }));
+                });
+          } catch (final Throwable t) {
+            log.error("Zeta SDK WebSocket connection failed: {}", t.getMessage(), t);
+            connectionError.set(t);
+            sessionReady.countDown();
+          }
+        });
 
     try {
-      if (!sessionReady.await(10, TimeUnit.SECONDS)) {
+      if (!sessionReady.await(20, TimeUnit.SECONDS)) {
         throw new RuntimeException("Connection timeout");
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(
           "Thread was interrupted while waiting for WebSocket connection", e);
+    }
+
+    final Throwable error = connectionError.get();
+    if (error != null) {
+      throw new RuntimeException("WebSocket connection failed: " + error.getMessage(), error);
     }
   }
 

@@ -26,6 +26,7 @@ import de.gematik.ws.conn.servicedirectory.VersionType;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,26 +40,46 @@ public class ServicePathExtractor {
   private static final String CARD_SERVICE_NAME = "CardService";
   @Getter private final String connectorUrl;
   private final boolean isSecureConnectionEnabled;
+
+  /**
+   * Out virtual connector (popp-smartphone-connector) has to provide two different versions of
+   * EventService in its service discovery document. One version is being used by the primary
+   * service. This version points to the service implemented by the virtual connector itself where
+   * getCards will return the egks connected via cardlink websocket.
+   *
+   * <p>One version is used by the popp client (i.e. this app). That version points has a location
+   * pointed at the real connector proxy implemented by the virtual connector. The proxy just passes
+   * requests on to the real hardware connector. This way the popp client can retrieve the real
+   * smc-bs from the real connector.
+   *
+   * <p>This is a bit of a hack. The versions are just used to distinguish between a service
+   * implemented by the virtual connector itself and the proxy that just forwards requests.
+   */
+  private final String realConnectorEventServiceVersion;
+
   private final ConnectorServicesFactory connectorServicesFactory;
 
   public ServicePathExtractor(
       @Value("${connector.end-point-url}") final String connectorUrl,
       @Value("${connector.secure.enable:false}") final boolean isSecureConnectionEnabled,
+      @Value("${connector.real-connector-event-service-version:}")
+          final String realConnectorEventServiceVersion,
       final ConnectorServicesFactory connectorServicesFactory) {
     this.connectorUrl = connectorUrl;
     this.isSecureConnectionEnabled = isSecureConnectionEnabled;
+    this.realConnectorEventServiceVersion = realConnectorEventServiceVersion;
     this.connectorServicesFactory = connectorServicesFactory;
   }
 
   public ServicePath getEventServicePath() {
-    return getServicePath(EVENT_SERVICE_NAME);
+    return getServicePath(EVENT_SERVICE_NAME, realConnectorEventServiceVersion);
   }
 
   public ServicePath getCardServicePath() {
-    return getServicePath(CARD_SERVICE_NAME);
+    return getServicePath(CARD_SERVICE_NAME, null);
   }
 
-  private ServicePath getServicePath(final String serviceName) {
+  private ServicePath getServicePath(final String serviceName, String version) {
     log.info("Extracting service information for '{}' from connector.sds", serviceName);
     final List<VersionType> serviceVersions = getServiceVersions(serviceName);
 
@@ -66,16 +87,27 @@ public class ServicePathExtractor {
       log.warn("Service '{}' not defined in connector.sds", serviceName);
       return null;
     }
+    VersionType versionType = null;
 
-    final VersionType latestVersion = getLatestVersion(serviceVersions);
+    if (!Objects.isNull(version) && !version.isEmpty()) {
+      var serviceOfVersion =
+          serviceVersions.stream().filter(v -> v.getVersion().equals(version)).findFirst();
+      if (serviceOfVersion.isPresent()) {
+        versionType = serviceOfVersion.get();
+      }
+    }
 
-    final String location = getLocation(latestVersion);
+    if (versionType == null) {
+      versionType = getLatestVersion(serviceVersions);
+    }
+
+    final String location = getLocation(versionType);
     final String endpointPath = getPath(location);
 
     log.info("Service path for '{}' is '{}'", serviceName, endpointPath);
 
     final ServicePath servicePath = new ServicePath();
-    servicePath.setVersion(latestVersion.getVersion());
+    servicePath.setVersion(versionType.getVersion());
     servicePath.setPath(endpointPath);
     return servicePath;
   }

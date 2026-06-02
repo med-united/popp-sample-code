@@ -82,6 +82,20 @@ public class GetCardsClient extends SoapClient {
     return determineCardHandleResponse;
   }
 
+  public String performGetSmcbCardHandle(String cardId) {
+    final GetCards soapRequest = createSoapRequestObject();
+    soapRequest.setCardType(CardTypeType.SMC_B);
+    final String endpoint = serviceEndpointProvider.getEventServiceFullEndpoint();
+    final GetCardsResponse soapResponse =
+        sendRequest(soapRequest, endpoint, GetCardsResponse.class);
+
+    return soapResponse.getCards().getCard().stream()
+        .filter(smcb -> cardId == null || smcb.getIccsn().equals(cardId))
+        .map(CardInfoType::getCardHandle)
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No SMC-B card found"));
+  }
+
   private GetCards createSoapRequestObject() {
     return createGetCards();
   }
@@ -90,7 +104,7 @@ public class GetCardsClient extends SoapClient {
     final ContextType contextType = getContextType();
     final GetCards getCards = new GetCards();
     getCards.setContext(contextType);
-
+    getCards.setCardType(CardTypeType.EGK);
     return getCards;
   }
 

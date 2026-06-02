@@ -45,6 +45,10 @@ public class ClientServerCommunicationService {
   }
 
   public void connect() {
+    connect(null);
+  }
+
+  public void connect(String cardId) {
     log.debug("| Entering connect()");
 
     this.secureWebSocketClient = createNewWebSocketClient();
@@ -52,7 +56,7 @@ public class ClientServerCommunicationService {
     if (secureWebSocketClient.isClosed() || !secureWebSocketClient.isOpen()) {
       log.info("| Websocket client is closed");
       try {
-        secureWebSocketClient.connectBlocking();
+        secureWebSocketClient.connectBlocking(cardId);
       } catch (final Exception e) {
         log.error("Error connecting to WebSocket server: {}", e.getMessage(), e);
         Thread.currentThread().interrupt();

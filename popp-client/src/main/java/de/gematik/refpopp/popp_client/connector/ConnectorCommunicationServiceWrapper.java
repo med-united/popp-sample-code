@@ -56,6 +56,14 @@ public class ConnectorCommunicationServiceWrapper {
     return realConnectorCommunicationService.getConnectedEgkCard();
   }
 
+  public String getSmcbCardHandle(String cardId) {
+    if (isMock()) {
+      return null;
+    }
+
+    return realConnectorCommunicationService.getSmcbCardHandle(cardId);
+  }
+
   public String startCardSession(final String cardHandle) {
     if (isMock()) {
       return mockConnectorCommunicationService.startCardSession(cardHandle);

@@ -44,7 +44,8 @@ class ServicePathExtractorTest {
   @BeforeEach
   void setUp() {
     connectorServicesFactoryMock = mock(ConnectorServicesFactory.class);
-    sut = new ServicePathExtractor("http://localhost:8080", false, connectorServicesFactoryMock);
+    sut =
+        new ServicePathExtractor("http://localhost:8080", false, "", connectorServicesFactoryMock);
   }
 
   @Test
@@ -104,7 +105,7 @@ class ServicePathExtractorTest {
   void getCardServicePathWithTlsEndpoint() {
     // given
     ServicePathExtractor secureServicePathExtractor =
-        new ServicePathExtractor("http://localhost:8080", true, connectorServicesFactoryMock);
+        new ServicePathExtractor("http://localhost:8080", true, "", connectorServicesFactoryMock);
     final var connectorServicesMock = mock(ConnectorServices.class, RETURNS_DEEP_STUBS);
     when(connectorServicesFactoryMock.createConnectorServices()).thenReturn(connectorServicesMock);
     final var serviceType = new ServiceType();

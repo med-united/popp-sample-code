@@ -49,4 +49,13 @@ public record PoppClientRequest(
                 """,
             example = "e7cd2f3a-5c0b-4f01-9d68-0cdd4db82f21",
             nullable = true)
-        String clientSessionId) {}
+        String clientSessionId,
+    @Schema(
+            description =
+                """
+                Optional Card Id.
+                Used for multi tenancy to allow users to select one of several smc-b.
+                """,
+            example = "e7cd2f3a-5c0b-4f01-9d68-0cdd4db82f21",
+            nullable = true)
+        String cardId) {}
