@@ -24,6 +24,8 @@ import de.gematik.refpopp.popp_client.client.events.TextMessageReceivedEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketCommunicationErrorEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketConnectionClosedEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketConnectionOpenedEvent;
+import de.gematik.refpopp.popp_client.connector.authsignatureservice.ExternalAuthenticateClient;
+import de.gematik.refpopp.popp_client.connector.certificateservice.ReadCardCertificateClient;
 import de.gematik.zeta.logging.Log;
 import de.gematik.zeta.sdk.BuildConfig;
 import de.gematik.zeta.sdk.TpmConfig;
@@ -34,9 +36,6 @@ import de.gematik.zeta.sdk.attestation.model.AttestationConfig;
 import de.gematik.zeta.sdk.attestation.model.PlatformProductId;
 import de.gematik.zeta.sdk.authentication.AuthConfig;
 import de.gematik.zeta.sdk.authentication.SubjectTokenProvider;
-import de.gematik.zeta.sdk.authentication.smcb.ConnectorApiImpl;
-import de.gematik.zeta.sdk.authentication.smcb.ConnectorHttpClientJvm;
-import de.gematik.zeta.sdk.authentication.smcb.SmcbTokenProvider;
 import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
 import de.gematik.zeta.sdk.storage.InMemoryStorage;
 import de.gematik.zeta.sdk.storage.StorageConfig;
@@ -70,15 +69,11 @@ public class SecureWebSocketClient {
   static final String PLATFORM_PRODUCT_VERSION = "latest";
 
   private final CommunicationEventPublisher eventPublisher;
-  private final String connectorBaseUrl;
-  private final String mandantId;
-  private final String clientSystemId;
-  private final String workplaceId;
   private final String cardHandle;
-  private final String connectorSecureKeystore;
-  private final String connectorSecureKeystorePassword;
   private final boolean disableServerValidation;
   private final URI serverUri;
+  private final ReadCardCertificateClient readCardCertificateClient;
+  private final ExternalAuthenticateClient externalAuthenticateClient;
   private final ZetaSdkClient zetaSdk;
   private final ExecutorService pool;
   private final CountDownLatch sessionReady = new CountDownLatch(1);
@@ -91,28 +86,19 @@ public class SecureWebSocketClient {
   public SecureWebSocketClient(
       @Value("${popp-server.url}") final URI serverUri,
       final CommunicationEventPublisher eventPublisher,
-      @Value("${connector.end-point-url}") final String connectorBaseUrl,
-      @Value("${connector.terminal-configuration.context.mandantId}") final String mandantId,
-      @Value("${connector.terminal-configuration.context.clientSystemId}")
-          final String clientSystemId,
-      @Value("${connector.terminal-configuration.context.workplaceId}") final String workplaceId,
       @Value("${connector.terminal-configuration.smcb-card-handle}") final String cardHandle,
-      @Value("${connector.secure.keystore}") final String connectorSecureKeystore,
-      @Value("${connector.secure.keystore-password}") final String connectorSecureKeystorePassword,
       @Value("${zeta.client.disableServerValidation}") final boolean disableServerValidation,
+      final ReadCardCertificateClient readCardCertificateClient,
+      final ExternalAuthenticateClient externalAuthenticateClient,
       final WsClientWrapper wsClientWrapper) {
     this.serverUri = serverUri;
     this.eventPublisher = eventPublisher;
     this.pool = Executors.newFixedThreadPool(1);
     this.sessionMetadata = new HashMap<>();
-    this.connectorBaseUrl = connectorBaseUrl;
-    this.mandantId = mandantId;
-    this.clientSystemId = clientSystemId;
-    this.workplaceId = workplaceId;
     this.cardHandle = cardHandle;
-    this.connectorSecureKeystore = connectorSecureKeystore;
-    this.connectorSecureKeystorePassword = connectorSecureKeystorePassword;
     this.disableServerValidation = disableServerValidation;
+    this.readCardCertificateClient = readCardCertificateClient;
+    this.externalAuthenticateClient = externalAuthenticateClient;
     this.wsClientWrapper = wsClientWrapper;
     Log.INSTANCE.initDebugLogger();
     this.zetaSdk =
@@ -171,18 +157,8 @@ public class SecureWebSocketClient {
   }
 
   private SubjectTokenProvider getTokenProvider() {
-    final var connectorEndpointBaseUrl =
-        connectorBaseUrl.endsWith("/") ? connectorBaseUrl + "ws/" : connectorBaseUrl + "/ws/";
-    final var connectorConfig =
-        new SmcbTokenProvider.ConnectorConfig(
-            connectorEndpointBaseUrl, mandantId, clientSystemId, workplaceId, "", cardHandle);
-    final var connectorApi =
-        new ConnectorApiImpl(
-            connectorConfig,
-            cfg ->
-                ConnectorHttpClientJvm.mtlsConnectorHttpClient(
-                    cfg, connectorSecureKeystore, connectorSecureKeystorePassword, "PKCS12"));
-    return new SmcbTokenProvider(connectorConfig, connectorApi);
+    return new PoppSubjectTokenProvider(
+        readCardCertificateClient, externalAuthenticateClient, cardHandle);
   }
 
   @PostConstruct

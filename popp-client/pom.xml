@@ -575,6 +575,25 @@
               <wsdlDirectory>
                 src/main/resources/api-telematik-OPB4
               </wsdlDirectory>
+              <wsdlFiles>
+                <wsdlFile>conn/AuthSignatureService.wsdl</wsdlFile>
+              </wsdlFiles>
+              <keep>true</keep>
+              <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
+            </configuration>
+          </execution>
+          <execution>
+            <id>certificate-service</id>
+            <goals>
+              <goal>wsimport</goal>
+            </goals>
+            <configuration>
+              <wsdlDirectory>
+                src/main/resources/api-telematik-OPB4
+              </wsdlDirectory>
+              <wsdlFiles>
+                <wsdlFile>conn/CertificateService.wsdl</wsdlFile>
+              </wsdlFiles>
               <keep>true</keep>
               <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
             </configuration>

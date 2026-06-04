@@ -37,6 +37,8 @@ public class ServicePathExtractor {
 
   private static final String EVENT_SERVICE_NAME = "EventService";
   private static final String CARD_SERVICE_NAME = "CardService";
+  private static final String CERTIFICATE_SERVICE_NAME = "CertificateService";
+  private static final String AUTH_SIGNATURE_SERVICE_NAME = "AuthSignatureService";
   @Getter private final String connectorUrl;
   private final boolean isSecureConnectionEnabled;
   private final ConnectorServicesFactory connectorServicesFactory;
@@ -56,6 +58,14 @@ public class ServicePathExtractor {
 
   public ServicePath getCardServicePath() {
     return getServicePath(CARD_SERVICE_NAME);
+  }
+
+  public ServicePath getCertificateServicePath() {
+    return getServicePath(CERTIFICATE_SERVICE_NAME);
+  }
+
+  public ServicePath getAuthSignatureServicePath() {
+    return getServicePath(AUTH_SIGNATURE_SERVICE_NAME);
   }
 
   private ServicePath getServicePath(final String serviceName) {

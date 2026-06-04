@@ -32,10 +32,15 @@ public class SoapActionVersionHelper {
   public static String buildSoapAction(
       ServiceEndpointProvider endpointProvider, SoapActions soapAction) {
     String version;
-    if (soapAction == SoapActions.GET_CARDS) {
-      version = getVersionFromServiceEndpoint(endpointProvider.getEventServiceEndpoint());
-    } else {
-      version = getVersionFromServiceEndpoint(endpointProvider.getCardServiceEndpoint());
+    switch (soapAction) {
+      case GET_CARDS ->
+          version = getVersionFromServiceEndpoint(endpointProvider.getEventServiceEndpoint());
+      case READ_CARD_CERTIFICATE ->
+          version = getVersionFromServiceEndpoint(endpointProvider.getCertificateServiceEndpoint());
+      case EXTERNAL_AUTHENTICATE ->
+          version =
+              getVersionFromServiceEndpoint(endpointProvider.getAuthSignatureServiceEndpoint());
+      default -> version = getVersionFromServiceEndpoint(endpointProvider.getCardServiceEndpoint());
     }
     return soapAction.getServiceEndpoint() + version + soapAction.getCommand();
   }
