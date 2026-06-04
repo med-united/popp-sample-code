@@ -150,7 +150,11 @@ public class TokenController {
         cardReaderService.startCheckForCardReader();
       }
       String token =
-          startCommunication(request.communicationType(), clientSessionId, request.virtualCard());
+          startCommunication(
+              request.communicationType(),
+              clientSessionId,
+              request.egkCardHandle(),
+              request.virtualCard());
       log.info("| Finished 'generate PoPP Token' successfully");
       return ResponseEntity.ok(PoppClientResponse.ok(token));
     } catch (UnsupportedOperationException e) {
@@ -167,12 +171,12 @@ public class TokenController {
   }
 
   private String startCommunication(
-      CardConnectionType type, String clientSessionId, String imageFile) {
+      CardConnectionType type, String clientSessionId, String egkCardHandle, String imageFile) {
     return switch (type) {
       case CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL ->
           communicationService.startConnectorMock(clientSessionId);
       case CONTACT_STANDARD, CONTACTLESS_STANDARD, CONTACT_CONNECTOR, CONTACTLESS_CONNECTOR ->
-          communicationService.start(type, clientSessionId);
+          communicationService.start(type, clientSessionId, egkCardHandle);
       case CONTACT_VIRTUAL ->
           communicationService.startVirtualCard(
               CardConnectionType.CONTACT_STANDARD, clientSessionId, imageFile);

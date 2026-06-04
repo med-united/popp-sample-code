@@ -1,5 +1,5 @@
 popp-server:
-  url: wss://popp-zeta-ingress:443/ws
+  url: ${POPP_SERVER_URL:wss://popp-zeta-ingress:443/ws}
 
 connector:
   end-point-url: ${CONNECTOR_END_POINT_URL:https://127.0.0.1}
@@ -18,6 +18,7 @@ connector:
       workplaceId: ${CONTEXT_WORKPLACE_ID:W1}
       mandantId: ${CONTEXT_MANDANT_ID:M1}
     ct-id: ${CARD_TERMINAL_ID:ktId} # Identifikation des Kartenterminals
+    smcb-card-handle: ${CONTEXT_SMCB_CARD_HANDLE:}
 
 zeta:
   client:

@@ -48,12 +48,12 @@ public class ConnectorCommunicationServiceWrapper {
     }
   }
 
-  public String getConnectedEgkCard() {
+  public String getConnectedEgkCard(final String egkCardHandle) {
     if (isMock()) {
       return mockConnectorCommunicationService.getConnectedEgkCard();
     }
 
-    return realConnectorCommunicationService.getConnectedEgkCard();
+    return realConnectorCommunicationService.getConnectedEgkCard(egkCardHandle);
   }
 
   public String startCardSession(final String cardHandle) {

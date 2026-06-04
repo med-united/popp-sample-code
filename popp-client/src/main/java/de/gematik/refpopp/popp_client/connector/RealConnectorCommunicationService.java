@@ -50,12 +50,12 @@ public class RealConnectorCommunicationService {
     this.secureSendAPDUClient = secureSendAPDUClient;
   }
 
-  public String getConnectedEgkCard() {
+  public String getConnectedEgkCard(final String egkCardHandle) {
     final DetermineCardHandleResponse determineCardHandleResponse =
         getCardsClient.performGetCards();
     final List<String> cardHandles = determineCardHandleResponse.getCardHandles();
 
-    return evaluateCardResponse(cardHandles);
+    return evaluateCardResponse(cardHandles, egkCardHandle);
   }
 
   public String startCardSession(final String cardHandle) {
@@ -70,9 +70,20 @@ public class RealConnectorCommunicationService {
     return secureSendAPDUClient.performSecureSendAPDU(signedScenario);
   }
 
-  private String evaluateCardResponse(final List<String> res) {
+  private String evaluateCardResponse(final List<String> res, final String egkCardHandle) {
     if (res.isEmpty()) {
       throw new IllegalStateException("| Error fetching EGK card response");
+    }
+    if (egkCardHandle != null && !egkCardHandle.isBlank()) {
+      if (res.contains(egkCardHandle)) {
+        log.info("| Using requested eGK card-handle '{}'", egkCardHandle);
+        return egkCardHandle;
+      }
+      throw new IllegalStateException(
+          "Requested eGK card-handle '"
+              + egkCardHandle
+              + "' not found in Konnektor's connected cards: "
+              + res);
     }
     return res.getFirst();
   }

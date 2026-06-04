@@ -67,7 +67,14 @@ public class CommunicationService {
   private int tokenWaitTimeoutSeconds;
 
   public String start(final CardConnectionType cardConnectionType, final String clientSessionId) {
-    final var sessionId = resolveSessionId(clientSessionId, cardConnectionType);
+    return start(cardConnectionType, clientSessionId, null);
+  }
+
+  public String start(
+      final CardConnectionType cardConnectionType,
+      final String clientSessionId,
+      final String egkCardHandle) {
+    final var sessionId = resolveSessionId(clientSessionId, cardConnectionType, egkCardHandle);
     CompletableFuture<String> tokenFuture = new CompletableFuture<>();
     tokenQueue.put(sessionId, tokenFuture);
     executeStart(cardConnectionType, sessionId);
@@ -131,7 +138,7 @@ public class CommunicationService {
     sslSession.put(CARD_CONNECTION_TYPE, cardConnectionType);
     sslSession.put(VIRTUAL_CARD, true);
 
-    final var sessionId = resolveSessionId(clientSessionId, cardConnectionType);
+    final var sessionId = resolveSessionId(clientSessionId, cardConnectionType, null);
     putSessionIdIntoSSLSession(sessionId);
 
     CompletableFuture<String> tokenFuture = new CompletableFuture<>();
@@ -325,10 +332,12 @@ public class CommunicationService {
   }
 
   private String resolveSessionId(
-      final String sessionUUID, final CardConnectionType cardConnectionType) {
+      final String sessionUUID,
+      final CardConnectionType cardConnectionType,
+      final String egkCardHandle) {
     if (usesConnectorSession(cardConnectionType)) {
       return connectorCommunicationServiceWrapper.startCardSession(
-          connectorCommunicationServiceWrapper.getConnectedEgkCard());
+          connectorCommunicationServiceWrapper.getConnectedEgkCard(egkCardHandle));
     }
     final var sessionUUIDExists = sessionUUID != null && !sessionUUID.isEmpty();
     return sessionUUIDExists ? sessionUUID : UUID.randomUUID().toString();

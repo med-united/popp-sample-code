@@ -58,4 +58,14 @@ public record PoppClientRequest(
                 """,
             example = "IMG_eGK_G21_TU_root6 1.xml",
             nullable = true)
-        String virtualCard) {}
+        String virtualCard,
+    @Schema(
+            description =
+                """
+                Optional Konnektor card-handle of the eGK to use. Only consulted for
+                connector-based communication types; when blank the first connected eGK
+                returned by the Konnektor is used.
+                """,
+            example = "EGK-7",
+            nullable = true)
+        String egkCardHandle) {}

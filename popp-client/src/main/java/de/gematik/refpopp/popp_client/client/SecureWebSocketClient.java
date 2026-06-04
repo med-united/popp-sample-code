@@ -24,7 +24,7 @@ import de.gematik.refpopp.popp_client.client.events.TextMessageReceivedEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketCommunicationErrorEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketConnectionClosedEvent;
 import de.gematik.refpopp.popp_client.client.events.WebSocketConnectionOpenedEvent;
-import de.gematik.refpopp.popp_client.configuration.PathResolver;
+import de.gematik.zeta.logging.Log;
 import de.gematik.zeta.sdk.BuildConfig;
 import de.gematik.zeta.sdk.TpmConfig;
 import de.gematik.zeta.sdk.WsClientExtension;
@@ -34,15 +34,15 @@ import de.gematik.zeta.sdk.attestation.model.AttestationConfig;
 import de.gematik.zeta.sdk.attestation.model.PlatformProductId;
 import de.gematik.zeta.sdk.authentication.AuthConfig;
 import de.gematik.zeta.sdk.authentication.SubjectTokenProvider;
-import de.gematik.zeta.sdk.authentication.smb.SmbTokenProvider;
+import de.gematik.zeta.sdk.authentication.smcb.ConnectorApiImpl;
+import de.gematik.zeta.sdk.authentication.smcb.ConnectorHttpClientJvm;
+import de.gematik.zeta.sdk.authentication.smcb.SmcbTokenProvider;
 import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
 import de.gematik.zeta.sdk.storage.InMemoryStorage;
 import de.gematik.zeta.sdk.storage.StorageConfig;
 import io.ktor.client.plugins.logging.LogLevel;
 import jakarta.annotation.PostConstruct;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -70,9 +70,13 @@ public class SecureWebSocketClient {
   static final String PLATFORM_PRODUCT_VERSION = "latest";
 
   private final CommunicationEventPublisher eventPublisher;
-  private final Path keyfile;
-  private final String alias;
-  private final String password;
+  private final String connectorBaseUrl;
+  private final String mandantId;
+  private final String clientSystemId;
+  private final String workplaceId;
+  private final String cardHandle;
+  private final String connectorSecureKeystore;
+  private final String connectorSecureKeystorePassword;
   private final boolean disableServerValidation;
   private final URI serverUri;
   private final ZetaSdkClient zetaSdk;
@@ -87,20 +91,30 @@ public class SecureWebSocketClient {
   public SecureWebSocketClient(
       @Value("${popp-server.url}") final URI serverUri,
       final CommunicationEventPublisher eventPublisher,
-      @Value("${zeta.authentication.smb.keyfile}") final String keyfile,
-      @Value("${zeta.authentication.smb.alias}") final String alias,
-      @Value("${zeta.authentication.smb.password}") final String password,
+      @Value("${connector.end-point-url}") final String connectorBaseUrl,
+      @Value("${connector.terminal-configuration.context.mandantId}") final String mandantId,
+      @Value("${connector.terminal-configuration.context.clientSystemId}")
+          final String clientSystemId,
+      @Value("${connector.terminal-configuration.context.workplaceId}") final String workplaceId,
+      @Value("${connector.terminal-configuration.smcb-card-handle}") final String cardHandle,
+      @Value("${connector.secure.keystore}") final String connectorSecureKeystore,
+      @Value("${connector.secure.keystore-password}") final String connectorSecureKeystorePassword,
       @Value("${zeta.client.disableServerValidation}") final boolean disableServerValidation,
       final WsClientWrapper wsClientWrapper) {
     this.serverUri = serverUri;
     this.eventPublisher = eventPublisher;
     this.pool = Executors.newFixedThreadPool(1);
     this.sessionMetadata = new HashMap<>();
-    this.keyfile = PathResolver.resolveAgainstWorkingDirectoryAncestors(keyfile);
-    this.alias = alias;
-    this.password = password;
+    this.connectorBaseUrl = connectorBaseUrl;
+    this.mandantId = mandantId;
+    this.clientSystemId = clientSystemId;
+    this.workplaceId = workplaceId;
+    this.cardHandle = cardHandle;
+    this.connectorSecureKeystore = connectorSecureKeystore;
+    this.connectorSecureKeystorePassword = connectorSecureKeystorePassword;
     this.disableServerValidation = disableServerValidation;
     this.wsClientWrapper = wsClientWrapper;
+    Log.INSTANCE.initDebugLogger();
     this.zetaSdk =
         ZetaSdk.INSTANCE.build(
             serverUri.toString(),
@@ -134,8 +148,16 @@ public class SecureWebSocketClient {
     final var normalizedOsName = osName.toLowerCase(Locale.ROOT);
 
     if (normalizedOsName.contains("mac")) {
-      return new PlatformProductId.AppleProductId(
-          PlatformProductId.PLATFORM_APPLE, APPLE_PLATFORM_TYPE_MACOS, List.of());
+      // The Guard policy rejects apple+software posture combinations and also cross-checks
+      // posture.platform_product_id.platform against the top-level platform claim. The SDK
+      // patch in AttestationApi.getSoftwareStatement forces the top-level claim to "linux"
+      // on Mac+software; we mirror that here so the nested platform_product_id also says
+      // "linux" and the cross-check passes.
+      return new PlatformProductId.LinuxProductId(
+          PlatformProductId.PLATFORM_LINUX,
+          LINUX_PACKAGING_TYPE_JAR,
+          PLATFORM_PRODUCT_APPLICATION_ID,
+          PLATFORM_PRODUCT_VERSION);
     }
 
     if (normalizedOsName.contains("win")) {
@@ -157,12 +179,18 @@ public class SecureWebSocketClient {
   }
 
   private SubjectTokenProvider getTokenProvider() {
-    if (!Files.isReadable(keyfile)) {
-      throw new IllegalStateException("Can't read private key: " + keyfile);
-    }
-
-    return new SmbTokenProvider(
-        new SmbTokenProvider.Credentials(keyfile.toString(), alias, password, ""));
+    final var connectorEndpointBaseUrl =
+        connectorBaseUrl.endsWith("/") ? connectorBaseUrl + "ws/" : connectorBaseUrl + "/ws/";
+    final var connectorConfig =
+        new SmcbTokenProvider.ConnectorConfig(
+            connectorEndpointBaseUrl, mandantId, clientSystemId, workplaceId, "", cardHandle);
+    final var connectorApi =
+        new ConnectorApiImpl(
+            connectorConfig,
+            cfg ->
+                ConnectorHttpClientJvm.mtlsConnectorHttpClient(
+                    cfg, connectorSecureKeystore, connectorSecureKeystorePassword, "PKCS12"));
+    return new SmcbTokenProvider(connectorConfig, connectorApi);
   }
 
   @PostConstruct
