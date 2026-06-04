@@ -148,16 +148,8 @@ public class SecureWebSocketClient {
     final var normalizedOsName = osName.toLowerCase(Locale.ROOT);
 
     if (normalizedOsName.contains("mac")) {
-      // The Guard policy rejects apple+software posture combinations and also cross-checks
-      // posture.platform_product_id.platform against the top-level platform claim. The SDK
-      // patch in AttestationApi.getSoftwareStatement forces the top-level claim to "linux"
-      // on Mac+software; we mirror that here so the nested platform_product_id also says
-      // "linux" and the cross-check passes.
-      return new PlatformProductId.LinuxProductId(
-          PlatformProductId.PLATFORM_LINUX,
-          LINUX_PACKAGING_TYPE_JAR,
-          PLATFORM_PRODUCT_APPLICATION_ID,
-          PLATFORM_PRODUCT_VERSION);
+      return new PlatformProductId.AppleProductId(
+          PlatformProductId.PLATFORM_APPLE, APPLE_PLATFORM_TYPE_MACOS, List.of());
     }
 
     if (normalizedOsName.contains("win")) {
