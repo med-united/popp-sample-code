@@ -53,5 +53,5 @@ jobs:
       - name: Build and push
         run: |
           mvn clean package -pl popp-client --also-make -Dskip.dockerbuild=false -DskipTests -Ddocker.image.name=popp-client
-          docker tag popp-client:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
+          docker tag popp-client:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-client:latest
           docker push 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-client:latest
