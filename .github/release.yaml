@@ -1,0 +1,57 @@
+name: Release Pipeline
+
+permissions:
+  id-token: write   # required — lets the workflow request the OIDC token
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  push:
+    permissions:
+      id-token: write   # required — lets the workflow request the OIDC token
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::765415433338:role/uhp-ecr-push-role
+          aws-region: eu-central-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Checkout zeta-sdk
+        uses: actions/checkout@v4
+        with:
+          repository: med-united/zeta-sdk
+          path: zeta-sdk
+
+      - name: Publish zeta-sdk to Maven local
+        working-directory: zeta-sdk
+        run: |
+          ./gradlew publishToMavenLocal \
+            -Pde.gematik.zeta.sdk.build-logic.enableAndroid=false \
+            -Pde.gematik.zeta.sdk.build-logic.enableIOS=false \
+            -Pde.gematik.zeta.sdk.build-logic.enableMacOS=false \
+            -Pde.gematik.zeta.sdk.build-logic.enableLinux=false \
+            -Pde.gematik.zeta.sdk.build-logic.enableWindows=false
+
+      - name: Build and push
+        run: |
+          mvn clean package -pl popp-client --also-make -Dskip.dockerbuild=false -DskipTests -Ddocker.image.name=popp-client
+          docker tag popp-client:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
+          docker push 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-client:latest
