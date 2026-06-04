@@ -43,7 +43,8 @@ jobs:
       - name: Publish zeta-sdk to Maven local
         working-directory: zeta-sdk
         run: |
-          ./gradlew publishToMavenLocal \
+            RELEASE_VERSION=0.5.1-service-health \
+            ./gradlew publishToMavenLocal \
             -Pde.gematik.zeta.sdk.build-logic.enableAndroid=false \
             -Pde.gematik.zeta.sdk.build-logic.enableIOS=false \
             -Pde.gematik.zeta.sdk.build-logic.enableMacOS=false \
