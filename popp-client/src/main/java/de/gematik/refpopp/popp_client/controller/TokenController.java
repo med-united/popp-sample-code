@@ -36,10 +36,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/token")
@@ -99,7 +96,8 @@ public class TokenController {
                             value =
                                 """
                                 {
-                                  "communicationType": "contact-virtual"
+                                  "communicationType": "contact-virtual",
+                                  "virtualCard": "IMG_eGK_G21_TU_root6 1.xml"
                                 }
                                 """),
                         @ExampleObject(
@@ -107,7 +105,8 @@ public class TokenController {
                             value =
                                 """
                                 {
-                                  "communicationType": "contactless-virtual"
+                                  "communicationType": "contactless-virtual",
+                                  "virtualCard": "IMG_eGK_G21_TU_root6 1.xml"
                                 }
                                 """),
                         @ExampleObject(
@@ -151,7 +150,8 @@ public class TokenController {
       if (request.communicationType().requiresCardReader()) {
         cardReaderService.startCheckForCardReader();
       }
-      String token = startCommunication(request.communicationType(), clientSessionId, cardId);
+      String token =
+          startCommunication(request.communicationType(), clientSessionId, request.virtualCard(), cardId);
       log.info("| Finished 'generate PoPP Token' successfully");
       return ResponseEntity.ok(PoppClientResponse.ok(token));
     } catch (UnsupportedOperationException e) {
@@ -168,7 +168,7 @@ public class TokenController {
   }
 
   private String startCommunication(
-      CardConnectionType type, String clientSessionId, String cardId) {
+      CardConnectionType type, String clientSessionId, String imageFile, String cardId) {
     return switch (type) {
       case CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL ->
           communicationService.startConnectorMock(clientSessionId);
@@ -176,10 +176,10 @@ public class TokenController {
           communicationService.start(type, clientSessionId, cardId);
       case CONTACT_VIRTUAL ->
           communicationService.startVirtualCard(
-              CardConnectionType.CONTACT_STANDARD, clientSessionId);
+              CardConnectionType.CONTACT_STANDARD, clientSessionId, imageFile);
       case CONTACTLESS_VIRTUAL ->
           communicationService.startVirtualCard(
-              CardConnectionType.CONTACTLESS_STANDARD, clientSessionId);
+              CardConnectionType.CONTACTLESS_STANDARD, clientSessionId, imageFile);
 
       case G3 -> throw new UnsupportedOperationException("G3 not yet implemented");
       default -> throw new UnsupportedOperationException("Unsupported type: " + type);

@@ -29,7 +29,6 @@ import de.gematik.refpopp.popp_client.configuration.ZetaSmcbProperties;
 import de.gematik.refpopp.popp_client.connector.ConnectorCommunicationServiceWrapper;
 import de.gematik.refpopp.popp_client.connector.Context;
 import de.gematik.zeta.sdk.BuildConfig;
-import de.gematik.zeta.sdk.StorageConfig;
 import de.gematik.zeta.sdk.TpmConfig;
 import de.gematik.zeta.sdk.WsClientExtension;
 import de.gematik.zeta.sdk.ZetaSdk;
@@ -43,6 +42,7 @@ import de.gematik.zeta.sdk.authentication.smcb.ConnectorApiImpl;
 import de.gematik.zeta.sdk.authentication.smcb.SmcbTokenProvider;
 import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
 import de.gematik.zeta.sdk.storage.InMemoryStorage;
+import de.gematik.zeta.sdk.storage.StorageConfig;
 import io.ktor.client.plugins.logging.LogLevel;
 import jakarta.annotation.PostConstruct;
 import java.net.URI;
@@ -133,25 +133,26 @@ public class SecureWebSocketClient {
         (String cardId) ->
             ZetaSdk.INSTANCE.build(
                 serverUri.toString(),
-                new BuildConfig(
-                    "demo-client",
-                    "0.2.0",
-                    "sdk-client",
-                    new StorageConfig(
-                        new InMemoryStorage(), "7aae7xXr8rnzVqjpYbosS0CFMrlprkD7jbVotm0fd+w="),
-                    new TpmConfig() {},
-                    new AuthConfig(
-                        List.of("popp"),
-                        30L,
-                        true,
-                        getTokenProvider(cardId),
-                        AttestationConfig.software()),
-                    createPlatformProductId(),
-                    new ZetaHttpClientBuilder("")
-                        .disableServerValidation(disableServerValidation)
-                        .logging(LogLevel.ALL, message -> log.info("Ktor HttpClient: {}", message)),
-                    null,
-                    null));
+                    new BuildConfig(
+                            "demo-client",
+                            "0.2.0",
+                            "sdk-client",
+                            new StorageConfig.Custom(new InMemoryStorage()),
+                            new TpmConfig() {},
+                            new AuthConfig(
+                                    List.of("popp"),
+                                    30L,
+                                    true,
+                                    getTokenProvider(cardId),
+                                    AttestationConfig.software(),
+                                    ""),
+                            createPlatformProductId(),
+                            new ZetaHttpClientBuilder("")
+                                    .disableServerValidation(disableServerValidation)
+                                    .logging(LogLevel.ALL),
+                            null,
+                            null,
+                            null));
     this.defaultZetaSdk = this.zetaSdkGenerator.apply(null);
   }
 
@@ -269,7 +270,7 @@ public class SecureWebSocketClient {
         cardId == null
             ? defaultZetaSdk
             : zetaSdkCache.computeIfAbsent(cardId, (key) -> this.zetaSdkGenerator.apply(cardId));
-    final AtomicReference<Throwable> connectionError = new AtomicReference<>();
+    final AtomicReference<Throwable> connectError = new AtomicReference<>();
     pool.submit(
         () -> {
           try {
@@ -277,7 +278,7 @@ public class SecureWebSocketClient {
                 zetaSdk,
                 this.serverUri.toString(),
                 builder -> {
-                  builder.disableServerValidation(true);
+                  builder.disableServerValidation(disableServerValidation);
                   return Unit.INSTANCE;
                 },
                 new HashMap<>(),
@@ -288,8 +289,7 @@ public class SecureWebSocketClient {
 
                   while (true) {
                     WsClientExtension.WsMessage incoming = session.receiveNext();
-                    if (incoming == null
-                        || incoming instanceof WsClientExtension.WsMessage.Close) {
+                    if (incoming == null || incoming instanceof WsClientExtension.WsMessage.Close) {
                       log.debug("WebSocket closed.");
                       break;
                     }
@@ -297,31 +297,30 @@ public class SecureWebSocketClient {
                       log.debug("WebSocket received: {}", text.getText());
                       onMessage(text.getText());
                     } else if (incoming instanceof WsClientExtension.WsMessage.Binary bin) {
-                      log.debug(
-                          "WebSocket received binary (bytes): {}", bin.getBytes().length);
+                      log.debug("WebSocket received binary (bytes): {}", bin.getBytes().length);
                     }
                   }
                 });
           } catch (final Throwable t) {
-            log.error("Zeta SDK WebSocket connection failed: {}", t.getMessage(), t);
-            connectionError.set(t);
+            connectError.set(t);
+            log.error("WebSocket connect failed: {}", t.getMessage(), t);
             sessionReady.countDown();
           }
         });
 
     try {
-      if (!sessionReady.await(20, TimeUnit.SECONDS)) {
+      if (!sessionReady.await(150, TimeUnit.SECONDS)) {
         throw new RuntimeException("Connection timeout");
+      }
+      final Throwable cause = connectError.get();
+      if (cause != null) {
+        throw new RuntimeException(
+            "Failed to establish WebSocket connection: " + cause.getMessage(), cause);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(
           "Thread was interrupted while waiting for WebSocket connection", e);
-    }
-
-    final Throwable error = connectionError.get();
-    if (error != null) {
-      throw new RuntimeException("WebSocket connection failed: " + error.getMessage(), error);
     }
   }
 
