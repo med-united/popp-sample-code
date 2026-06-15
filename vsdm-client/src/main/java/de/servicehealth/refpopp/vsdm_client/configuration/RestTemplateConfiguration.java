@@ -18,15 +18,22 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
-package de.servicehealth.refpopp.vsdm_client.converter;
+package de.servicehealth.refpopp.vsdm_client.configuration;
 
-public class VsdmProcessingException extends RuntimeException {
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
 
-  public VsdmProcessingException(String message) {
-    super(message);
-  }
+@Configuration
+public class RestTemplateConfiguration {
 
-  public VsdmProcessingException(String message, Throwable cause) {
-    super(message, cause);
+  @Bean
+  RestTemplate restTemplate() {
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(5000);
+    factory.setReadTimeout(10000);
+
+    return new RestTemplate(factory);
   }
 }

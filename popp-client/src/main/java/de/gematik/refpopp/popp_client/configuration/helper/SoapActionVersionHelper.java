@@ -20,41 +20,39 @@
 
 package de.gematik.refpopp.popp_client.configuration.helper;
 
+import de.gematik.refpopp.popp_client.connector.soap.ServiceEndpoint;
 import de.gematik.refpopp.popp_client.connector.soap.ServiceEndpointProvider;
 import de.gematik.refpopp.popp_client.connector.soap.SoapActions;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import java.util.Objects;
-
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class SoapActionVersionHelper {
 
-    public static String buildSoapAction(ServiceEndpointProvider endpointProvider, SoapActions soapAction) {
-        String version;
-        if (Objects.requireNonNull(soapAction) == SoapActions.GET_CARDS) {
-            version = getVersionFromServiceEndpoint(endpointProvider, endpointProvider.getEventServiceEndpoint().getVersion());
-        } else {
-            version = getVersionFromServiceEndpoint(endpointProvider);
-        }
-        return soapAction.getServiceEndpoint() + version + soapAction.getCommand();
-    }
+  public static String buildSoapAction(
+      ServiceEndpointProvider endpointProvider, SoapActions soapAction) {
+    String version =
+        switch (soapAction) {
+          case GET_CARDS -> getVersion(endpointProvider.getEventServiceEndpoint());
+          case READ_CARD_CERTIFICATE ->
+              getVersion(endpointProvider.getCertificateServiceEndpoint());
+          case EXTERNAL_AUTHENTICATE ->
+              getVersion(endpointProvider.getAuthSignatureServiceEndpoint());
+          default -> getVersion(endpointProvider.getCardServiceEndpoint());
+        };
+    return soapAction.getServiceEndpoint() + version + soapAction.getCommand();
+  }
 
-    private static String getVersionFromServiceEndpoint(ServiceEndpointProvider endpointProvider) {
-        String version = endpointProvider.getCardServiceEndpoint().getVersion();
-        return getVersionFromServiceEndpoint(endpointProvider, version);
+  private static String getVersion(ServiceEndpoint endpoint) {
+    String version = endpoint.getVersion();
+    if (version == null || version.isBlank()) {
+      throw new IllegalStateException("Version is missing for " + endpoint.getEndpoint());
     }
-
-    private static String getVersionFromServiceEndpoint(ServiceEndpointProvider endpointProvider, String version) {
-        if (version == null || version.isBlank()) {
-            throw new IllegalStateException(
-                "Version is missing for " + endpointProvider.getCardServiceEndpoint().getEndpoint());
-        }
-        String[] parts = version.split("\\.");
-        if (parts.length < 2) {
-            throw new IllegalArgumentException(
-                "Unsupported version format (need at least x.y or x.y.z), but got: " + version);
-        }
-        return parts[0] + "." + parts[1];
+    String[] parts = version.split("\\.");
+    if (parts.length < 2) {
+      throw new IllegalArgumentException(
+          "Unsupported version format (need at least x.y or x.y.z), but got: " + version);
     }
+    return parts[0] + "." + parts[1];
+  }
 }

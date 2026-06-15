@@ -34,7 +34,7 @@ import org.springframework.ws.transport.http.MessageDispatcherServlet;
 
 @EnableWs
 @Configuration
-public class WebServiceConfig implements WsConfigurer {
+public class WebServiceConfiguration implements WsConfigurer {
 
   @Bean
   public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(

@@ -22,32 +22,32 @@ package de.servicehealth.refpopp.vsdm_client.endpoint;
 
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSDResponse;
+import de.servicehealth.refpopp.vsdm_client.service.PoppService;
 import de.servicehealth.refpopp.vsdm_client.service.VsdService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ws.server.endpoint.annotation.Endpoint;
 import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
 import org.springframework.ws.server.endpoint.annotation.RequestPayload;
 import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
 
+@Slf4j
 @Endpoint
+@RequiredArgsConstructor
 public class VsdServiceEndpoint {
 
-  private static final Logger logger = LoggerFactory.getLogger(VsdServiceEndpoint.class);
   private static final String NAMESPACE_URI = "http://ws.gematik.de/conn/vsds/VSDService/v5.2";
 
+  private final PoppService poppService;
   private final VsdService vsdService;
-
-  // Dependency Injection via constructor
-  public VsdServiceEndpoint(VsdService vsdService) {
-    this.vsdService = vsdService;
-  }
 
   @PayloadRoot(namespace = NAMESPACE_URI, localPart = "ReadVSD")
   @ResponsePayload
   public ReadVSDResponse readVsd(@RequestPayload ReadVSD request) {
-    logger.info("SOAP request 'ReadVSD' received in endpoint. Delegating to service.");
+    String ehcHandle = request.getEhcHandle();
+    log.info("Fetching FHIR bundle for EhcHandle: {}", ehcHandle);
 
-    return vsdService.processReadVsd(request);
+    TokenResponse tokenResponse = poppService.fetchPoppToken(ehcHandle);
+    return vsdService.processReadVsd(tokenResponse.token());
   }
 }

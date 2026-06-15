@@ -22,11 +22,13 @@ package de.servicehealth.refpopp.vsdm_client;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class VsdmClientApplication {
 
-  public static void main(final String[] args) {
-    SpringApplication.run(VsdmClientApplication.class, args);
-  }
+    public static void main(final String[] args) {
+        SpringApplication.run(VsdmClientApplication.class, args);
+    }
 }

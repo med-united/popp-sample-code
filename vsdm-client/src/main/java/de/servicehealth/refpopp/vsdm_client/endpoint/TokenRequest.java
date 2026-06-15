@@ -18,15 +18,6 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
-package de.servicehealth.refpopp.vsdm_client.converter;
+package de.servicehealth.refpopp.vsdm_client.endpoint;
 
-public class VsdmProcessingException extends RuntimeException {
-
-  public VsdmProcessingException(String message) {
-    super(message);
-  }
-
-  public VsdmProcessingException(String message, Throwable cause) {
-    super(message, cause);
-  }
-}
+public record TokenRequest(String communicationType, String egkHandle) {}

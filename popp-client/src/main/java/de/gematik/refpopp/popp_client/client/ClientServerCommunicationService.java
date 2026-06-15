@@ -62,9 +62,9 @@ public class ClientServerCommunicationService {
         log.info("| Websocket client is closed");
         try {
           secureWebSocketClient.connectBlocking();
-        } catch (final Exception e) {
+        } catch (final RuntimeException e) {
           log.error("Error connecting to WebSocket server: {}", e.getMessage(), e);
-          Thread.currentThread().interrupt();
+          throw e;
         }
       }
     } finally {

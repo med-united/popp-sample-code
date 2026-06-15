@@ -20,103 +20,39 @@
 
 package de.servicehealth.refpopp.vsdm_client.service;
 
-import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSDResponse;
 import de.gematik.ws.conn.vsds.vsdservice.v5.VSDStatusType;
 import de.servicehealth.refpopp.vsdm_client.converter.VsdmConverter;
-import java.nio.charset.StandardCharsets;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.util.FileCopyUtils;
-import org.springframework.web.client.RestTemplate;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class VsdService {
 
-  private static final Logger logger = LoggerFactory.getLogger(VsdService.class);
+    private final VsdmConverter vsdmConverter;
+    private final Vsdm2Client vsdm2Client;
 
-  private final VsdmConverter vsdmConverter;
-  private final Vsdm2Client vsdm2Client;
-  private final RestTemplate restTemplate;
+    public ReadVSDResponse processReadVsd(String poppToken) {
+        log.info("Processing ReadVSD request in the service layer.");
+        try {
+            // Step 1: Call the VSDM 2.0 backend (mock) with the PoPP token
+            String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
 
-  @Value("${popp.client.api.url:http://localhost:8081/token}")
-  private String poppClientApiUrl;
+            // Step 2: Convert FHIR bundle to ReadVSDResponse
+            return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
+        } catch (Exception e) {
+            log.error("Error processing ReadVSD request", e);
 
-  @Value("${popp.client.communication-type:contact-virtual}")
-  private String communicationType;
+            ReadVSDResponse errorResponse = new ReadVSDResponse();
+            VSDStatusType errorStatus = new VSDStatusType();
 
-  @Value("${popp.client.session-id:123456}")
-  private String clientSessionId;
-
-  @Value("${vsdm.mock.url:https://localhost:8082}")
-  private String vsdmMockUrl;
-
-  public VsdService(VsdmConverter vsdmConverter, Vsdm2Client vsdm2Client) {
-    this.vsdmConverter = vsdmConverter;
-    this.vsdm2Client = vsdm2Client;
-
-    // Set timeouts using SimpleClientHttpRequestFactory instead of RestTemplateBuilder
-    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-    factory.setConnectTimeout(5000); // 5000 ms = 5 seconds
-    factory.setReadTimeout(10000); // 10000 ms = 10 seconds
-    this.restTemplate = new RestTemplate(factory);
-  }
-
-  public ReadVSDResponse processReadVsd(ReadVSD request) {
-    logger.info("Processing ReadVSD request in the service layer.");
-
-    try {
-      // Step 1: Get the PoPP token
-      String poppToken = fetchPoppToken();
-
-      // Step 2: Extract EhcHandle from the request (card handle, not KVNR)
-      String ehcHandle = request.getEhcHandle();
-      logger.info("Fetching FHIR bundle for EhcHandle: {}", ehcHandle);
-
-      // Step 3: Call the VSDM 2.0 backend (mock) with the PoPP token
-      String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
-
-      // Step 4: Convert FHIR bundle to ReadVSDResponse
-      return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
-
-    } catch (Exception e) {
-      logger.error("Error processing ReadVSD request", e);
-
-      // Return a valid fallback response indicating a technical error
-      ReadVSDResponse errorResponse = new ReadVSDResponse();
-      VSDStatusType errorStatus = new VSDStatusType();
-      errorStatus.setStatus("-1"); // Oder ein Gematik-spezifischer Fehlercode
-      errorResponse.setVSDStatus(errorStatus);
-      return errorResponse;
+            // Oder ein Gematik-spezifischer Fehlercode
+            errorStatus.setStatus("-1");
+            errorResponse.setVSDStatus(errorStatus);
+            return errorResponse;
+        }
     }
-  }
-
-  private String fetchPoppToken() {
-    logger.info("Retrieving POPP token from API: {}", poppClientApiUrl);
-
-    TokenRequest requestPayload = new TokenRequest(communicationType, clientSessionId);
-
-    try {
-      TokenResponse response =
-          restTemplate.postForObject(poppClientApiUrl, requestPayload, TokenResponse.class);
-
-      if (response != null && response.token() != null && !response.token().isBlank()) {
-        return response.token();
-      } else {
-        logger.warn("Unexpected response or empty token. Response was: {}", response);
-        return "";
-      }
-    } catch (Exception e) {
-      logger.error("HTTP request to POPP client failed: {}", e.getMessage());
-      return "";
-    }
-  }
-
-  private record TokenRequest(String communicationType, String clientSessionId) {}
-
-  private record TokenResponse(String token, String error) {}
 }
