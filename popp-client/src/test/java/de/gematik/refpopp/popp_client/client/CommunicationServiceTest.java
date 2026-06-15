@@ -124,7 +124,7 @@ class CommunicationServiceTest {
 
     sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
   }
@@ -145,7 +145,7 @@ class CommunicationServiceTest {
     sut.start(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
 
     // then
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
     assertThat(((StartMessage) captor.getValue()).getClientSessionId())
@@ -165,7 +165,7 @@ class CommunicationServiceTest {
 
     sut.start(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
     assertThat(((StartMessage) captor.getValue()).getClientSessionId()).isEqualTo("connectorUUID");
@@ -182,7 +182,7 @@ class CommunicationServiceTest {
 
     sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
     assertThat(((StartMessage) captor.getValue()).getClientSessionId()).isEqualTo(clientSessionId);
@@ -199,7 +199,7 @@ class CommunicationServiceTest {
 
     sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     final StartMessage message = (StartMessage) captor.getValue();
     assertThat(message.getClientSessionId()).isEqualTo(clientSessionId);
@@ -250,7 +250,7 @@ class CommunicationServiceTest {
             CardConnectionType.CONTACT_STANDARD, "mock-session", "random/image/path");
 
     assertThat(token).isEqualTo("mock-token");
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(ssl).put("virtualCard", true);
     verify(ssl).put("cardConnectionType", CardConnectionType.CONTACT_STANDARD);
   }
@@ -493,7 +493,7 @@ class CommunicationServiceTest {
     String token = sut.startConnectorMock("mock-session");
 
     assertThat(token).isEqualTo("mock-token");
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(null);
     verify(ssl).put(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK, true);
   }
 

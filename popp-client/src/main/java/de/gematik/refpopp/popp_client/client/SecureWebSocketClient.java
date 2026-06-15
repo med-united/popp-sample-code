@@ -133,26 +133,26 @@ public class SecureWebSocketClient {
         (String cardId) ->
             ZetaSdk.INSTANCE.build(
                 serverUri.toString(),
-                    new BuildConfig(
-                            "demo-client",
-                            "0.2.0",
-                            "sdk-client",
-                            new StorageConfig.Custom(new InMemoryStorage()),
-                            new TpmConfig() {},
-                            new AuthConfig(
-                                    List.of("popp"),
-                                    30L,
-                                    true,
-                                    getTokenProvider(cardId),
-                                    AttestationConfig.software(),
-                                    ""),
-                            createPlatformProductId(),
-                            new ZetaHttpClientBuilder("")
-                                    .disableServerValidation(disableServerValidation)
-                                    .logging(LogLevel.ALL),
-                            null,
-                            null,
-                            null));
+                new BuildConfig(
+                    "demo-client",
+                    "0.2.0",
+                    "sdk-client",
+                    new StorageConfig.Custom(new InMemoryStorage()),
+                    new TpmConfig() {},
+                    new AuthConfig(
+                        List.of("popp"),
+                        30L,
+                        true,
+                        getTokenProvider(cardId),
+                        AttestationConfig.software(),
+                        ""),
+                    createPlatformProductId(),
+                    new ZetaHttpClientBuilder("")
+                        .disableServerValidation(disableServerValidation)
+                        .logging(LogLevel.ALL),
+                    null,
+                    null,
+                    null));
     this.defaultZetaSdk = this.zetaSdkGenerator.apply(null);
   }
 
@@ -208,7 +208,7 @@ public class SecureWebSocketClient {
             connectorContext.getWorkplaceId(),
             connectorContext.getUserId() != null ? connectorContext.getUserId() : "",
             smcbCardHandle);
-    return new SmcbTokenProvider(config, new ConnectorApiImpl(config));
+    return new SmcbTokenProvider(config, new ConnectorApiImpl(config, null));
   }
 
   private SmbTokenProvider getFileTokenProvider() {

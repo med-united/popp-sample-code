@@ -121,7 +121,7 @@ public class CommunicationService {
   }
 
   public String startConnectorMock(final String clientSessionId) {
-    clientServerCommunicationService.connect();
+    clientServerCommunicationService.connect(null);
     final Map<String, Object> sslSession = clientServerCommunicationService.getSSLSession();
     sslSession.put(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK, true);
     final var sessionId =
@@ -145,7 +145,7 @@ public class CommunicationService {
       virtualCardService.loadCardImage(imageFile);
     }
 
-    clientServerCommunicationService.connect();
+    clientServerCommunicationService.connect(null);
     final Map<String, Object> sslSession = clientServerCommunicationService.getSSLSession();
     sslSession.put(CARD_CONNECTION_TYPE, cardConnectionType);
     sslSession.put(VIRTUAL_CARD, true);
@@ -345,16 +345,15 @@ public class CommunicationService {
 
   private String resolveSessionId(
       final String sessionUUID, final CardConnectionType cardConnectionType) {
-    final var sessionUUIDExists = sessionUUID != null && !sessionUUID.isEmpty();
-
-    if (sessionUUIDExists) {
-      return sessionUUID;
-    }
-
     if (usesConnectorSession(cardConnectionType)) {
       return connectorCommunicationServiceWrapper.startCardSession(
           connectorCommunicationServiceWrapper.getConnectedEgkCard());
     }
+
+    if (sessionUUID != null && !sessionUUID.isEmpty()) {
+      return sessionUUID;
+    }
+
     return UUID.randomUUID().toString();
   }
 
