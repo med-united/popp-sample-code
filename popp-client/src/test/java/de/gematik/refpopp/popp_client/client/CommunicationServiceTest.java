@@ -132,7 +132,7 @@ class CommunicationServiceTest {
   @Test
   void startConnectsToWebSocketAndSendsStartMessageWithConnectorSessionId() {
     String clientSessionId = UUID.randomUUID().toString();
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard(anyString())).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk"))
         .thenReturn("connector-session");
     Map<String, Object> ssl =
@@ -155,7 +155,7 @@ class CommunicationServiceTest {
   @Test
   void startConnectsToWebSocketAndSendsStartMessageWithEmptyClientSessionId() {
     final String clientSessionId = "";
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard(anyString())).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk")).thenReturn("connectorUUID");
     Map<String, Object> ssl =
         prepareMockSslSession("connectorUUID", CardConnectionType.CONTACT_CONNECTOR);
@@ -499,7 +499,7 @@ class CommunicationServiceTest {
 
   @Test
   void whenContactConnectorAndInvalidClientSessionId_thenConnectorSessionIsUsed() {
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard(anyString())).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk"))
         .thenReturn("connector-session");
 
@@ -516,7 +516,7 @@ class CommunicationServiceTest {
 
   @Test
   void whenContactlessConnector_thenConnectorSessionIsUsed() {
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard(anyString())).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk"))
         .thenReturn("connector-session");
 

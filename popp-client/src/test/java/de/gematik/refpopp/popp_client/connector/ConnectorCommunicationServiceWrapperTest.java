@@ -59,7 +59,7 @@ class ConnectorCommunicationServiceWrapperTest {
     when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(true);
     when(mockConnectorCommunicationService.getConnectedEgkCard()).thenReturn("mock-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("XZ");
 
     assertEquals("mock-card", result);
     verify(mockConnectorCommunicationService).getConnectedEgkCard();
@@ -69,12 +69,12 @@ class ConnectorCommunicationServiceWrapperTest {
   @Test
   void whenMockIsNotSet_thenRealServiceIsUsed_forGetConnectedEgkCard() {
     when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(false);
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(realConnectorCommunicationService.getConnectedEgkCard("XZ")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("XZ");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("XZ");
     verifyNoInteractions(mockConnectorCommunicationService);
   }
 
@@ -82,35 +82,35 @@ class ConnectorCommunicationServiceWrapperTest {
   void whenSslSessionIsMissing_thenRealServiceIsUsed_forGetConnectedEgkCard() {
     when(clientServerCommunicationService.getSSLSession())
         .thenThrow(new RuntimeException("No SSL session"));
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(realConnectorCommunicationService.getConnectedEgkCard("XZ")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("XZ");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("XZ");
   }
 
   @Test
   void whenSslAttributeIsNull_thenRealServiceIsUsed_forGetConnectedEgkCard() {
     when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(null);
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(realConnectorCommunicationService.getConnectedEgkCard("XZ")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("XZ");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("XZ");
   }
 
   @Test
   void whenSslGetValueThrowsException_thenRealServiceIsUsed_forGetConnectedEgkCard() {
     when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK))
         .thenThrow(new IllegalStateException("broken session"));
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(realConnectorCommunicationService.getConnectedEgkCard("XZ")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("XZ");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("XZ");
   }
 
   // -------- startCardSession --------
