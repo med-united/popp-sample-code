@@ -7,14 +7,14 @@
   <parent>
     <groupId>de.gematik.refpopp</groupId>
     <artifactId>popp-example-impl-global</artifactId>
-    <version>2.0.0</version>
+    <version>2.5.1</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>vsdm-client</artifactId>
-  <version>2.0.0</version>
-  <name>vsdm-client</name>
   <description>VSDM Client Application</description>
+
+  <name>vsdm-client</name>
 
   <properties>
     <docker.image.name>${docker.registry.gematik}/popp/vsdm-client</docker.image.name>
@@ -123,7 +123,7 @@
                 </args>
                 <dockerFile>${basedir}/target/tmpdocker/Dockerfile</dockerFile>
               </build>
-              <name>${docker.image.name}:latest</name>
+              <name>${docker.image.name}:${project.version}</name>
             </image>
           </images>
           <skip>${skip.dockerbuild}</skip>
