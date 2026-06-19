@@ -44,3 +44,10 @@ card-reader:
 
 virtual-card:
   image-file:
+
+federation:
+  keystore:
+    location: "classpath:federation-keystore.jks"
+    password: "gematik"
+  entity-statement:
+    url: "http://localhost:1080/.well-known/openid-federation"
