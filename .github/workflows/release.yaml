@@ -24,6 +24,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
+          server-id: github
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -34,24 +35,11 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Checkout zeta-sdk
-        uses: actions/checkout@v4
-        with:
-          repository: med-united/zeta-sdk
-          path: zeta-sdk
-
-      - name: Publish zeta-sdk to Maven local
-        working-directory: zeta-sdk
-        run: |
-            RELEASE_VERSION=0.5.1-service-health \
-            ./gradlew publishToMavenLocal \
-            -Pde.gematik.zeta.sdk.build-logic.enableAndroid=false \
-            -Pde.gematik.zeta.sdk.build-logic.enableIOS=false \
-            -Pde.gematik.zeta.sdk.build-logic.enableMacOS=false \
-            -Pde.gematik.zeta.sdk.build-logic.enableLinux=false \
-            -Pde.gematik.zeta.sdk.build-logic.enableWindows=false
 
       - name: Build and push
+        env:
+          GITHUB_ACTOR: midnight-blue
+          GITHUB_TOKEN: ${{ secrets.PACKAGES_PAT }}
         run: |
           mvn clean package -pl popp-client --also-make -Dskip.dockerbuild=false -DskipTests -Ddocker.image.name=popp-client
           docker tag popp-client:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-client:latest
