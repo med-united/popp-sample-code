@@ -51,3 +51,6 @@ federation:
     password: "gematik"
   entity-statement:
     url: "http://localhost:1080/.well-known/openid-federation"
+logging:
+  level:
+    de.gematik.zeta: DEBUG

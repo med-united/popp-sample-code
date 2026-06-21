@@ -206,7 +206,7 @@ public class SecureWebSocketClient {
             connectorContext.getMandantId(),
             connectorContext.getClientSystemId(),
             connectorContext.getWorkplaceId(),
-            connectorContext.getUserId() != null ? connectorContext.getUserId() : "",
+            connectorContext.getUserId(),
             smcbCardHandle);
     return new SmcbTokenProvider(config, new ConnectorApiImpl(config, null));
   }
