@@ -29,6 +29,7 @@ import de.gematik.refpopp.popp_client.configuration.ZetaSmcbProperties;
 import de.gematik.refpopp.popp_client.connector.ConnectorCommunicationServiceWrapper;
 import de.gematik.refpopp.popp_client.connector.Context;
 import de.gematik.zeta.sdk.BuildConfig;
+import de.gematik.zeta.sdk.StorageConfig;
 import de.gematik.zeta.sdk.TpmConfig;
 import de.gematik.zeta.sdk.WsClientExtension;
 import de.gematik.zeta.sdk.ZetaSdk;
@@ -42,7 +43,6 @@ import de.gematik.zeta.sdk.authentication.smcb.ConnectorApiImpl;
 import de.gematik.zeta.sdk.authentication.smcb.SmcbTokenProvider;
 import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
 import de.gematik.zeta.sdk.storage.InMemoryStorage;
-import de.gematik.zeta.sdk.storage.StorageConfig;
 import io.ktor.client.plugins.logging.LogLevel;
 import jakarta.annotation.PostConstruct;
 import java.net.URI;
@@ -129,30 +129,23 @@ public class SecureWebSocketClient {
     this.wsClientWrapper = wsClientWrapper;
     this.zetaSdkCache = new ConcurrentHashMap<>();
 
-    this.zetaSdkGenerator =
-        (String cardId) ->
-            ZetaSdk.INSTANCE.build(
-                serverUri.toString(),
-                new BuildConfig(
-                    "demo-client",
-                    "0.2.0",
-                    "sdk-client",
-                    new StorageConfig.Custom(new InMemoryStorage()),
-                    new TpmConfig() {},
-                    new AuthConfig(
-                        List.of("popp"),
-                        30L,
-                        true,
-                        getTokenProvider(cardId),
-                        AttestationConfig.software(),
-                        ""),
-                    createPlatformProductId(),
-                    new ZetaHttpClientBuilder()
-                        .disableServerValidation(disableServerValidation)
-                        .logging(LogLevel.ALL),
-                    null,
-                    null,
-                    null));
+    this.zetaSdkGenerator = (String cardId) -> ZetaSdk.INSTANCE.build(
+        serverUri.toString(),
+        new BuildConfig(
+            "demo-client",
+            "0.2.0",
+            "sdk-client",
+            new StorageConfig(
+                new InMemoryStorage(), "7aae7xXr8rnzVqjpYbosS0CFMrlprkD7jbVotm0fd+w="),
+            new TpmConfig() {},
+            new AuthConfig(
+                List.of("popp"), 30L, true, getTokenProvider(cardId), AttestationConfig.software()),
+            createPlatformProductId(),
+            new ZetaHttpClientBuilder("")
+                .disableServerValidation(disableServerValidation)
+                .logging(LogLevel.ALL, message -> log.info("Ktor HttpClient: {}", message)),
+            null,
+            null));
     this.defaultZetaSdk = this.zetaSdkGenerator.apply(null);
   }
 
@@ -208,7 +201,7 @@ public class SecureWebSocketClient {
             connectorContext.getWorkplaceId(),
             connectorContext.getUserId() != null ? connectorContext.getUserId() : "",
             smcbCardHandle);
-    return new SmcbTokenProvider(config, new ConnectorApiImpl(config, null));
+    return new SmcbTokenProvider(config, new ConnectorApiImpl(config));
   }
 
   private SmbTokenProvider getFileTokenProvider() {

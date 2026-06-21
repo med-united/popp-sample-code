@@ -345,13 +345,14 @@ public class CommunicationService {
 
   private String resolveSessionId(
       final String sessionUUID, final CardConnectionType cardConnectionType) {
-    if (usesConnectorSession(cardConnectionType)) {
-      return connectorCommunicationServiceWrapper.startCardSession(
-          connectorCommunicationServiceWrapper.getConnectedEgkCard());
-    }
 
     if (sessionUUID != null && !sessionUUID.isEmpty()) {
       return sessionUUID;
+    }
+
+    if (usesConnectorSession(cardConnectionType)) {
+      return connectorCommunicationServiceWrapper.startCardSession(
+          connectorCommunicationServiceWrapper.getConnectedEgkCard());
     }
 
     return UUID.randomUUID().toString();
