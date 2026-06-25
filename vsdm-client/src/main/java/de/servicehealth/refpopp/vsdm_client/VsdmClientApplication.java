@@ -28,7 +28,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class VsdmClientApplication {
 
-    public static void main(final String[] args) {
-        SpringApplication.run(VsdmClientApplication.class, args);
-    }
+  public static void main(final String[] args) {
+    SpringApplication.run(VsdmClientApplication.class, args);
+  }
 }

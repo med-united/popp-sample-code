@@ -35,10 +35,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class VsdController {
 
-    private final VsdService vsdService;
+  private final VsdService vsdService;
 
-    @GetMapping(produces = APPLICATION_XML_VALUE)
-    public ReadVSDResponse readVsd(@RequestParam(name = "poppToken") String poppToken) {
-        return vsdService.processReadVsd(poppToken);
-    }
+  @GetMapping(produces = APPLICATION_XML_VALUE)
+  public ReadVSDResponse readVsd(@RequestParam(name = "poppToken") String poppToken) {
+    return vsdService.processReadVsd(poppToken);
+  }
 }

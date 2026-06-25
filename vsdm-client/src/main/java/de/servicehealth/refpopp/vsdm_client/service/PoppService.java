@@ -35,16 +35,16 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 public class PoppService {
 
-    private final RestTemplate restTemplate;
-    private final PoppClientProperties properties;
+  private final RestTemplate restTemplate;
+  private final PoppClientProperties properties;
 
-    public TokenResponse fetchPoppToken(String egkHandle) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(APPLICATION_JSON);
+  public TokenResponse fetchPoppToken(String egkHandle) {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(APPLICATION_JSON);
 
-        TokenRequest tokenRequest = new TokenRequest(properties.communicationType(), egkHandle);
-        HttpEntity<TokenRequest> entity = new HttpEntity<>(tokenRequest, headers);
+    TokenRequest tokenRequest = new TokenRequest(properties.communicationType(), egkHandle);
+    HttpEntity<TokenRequest> entity = new HttpEntity<>(tokenRequest, headers);
 
-        return restTemplate.postForObject(properties.apiUrl(), entity, TokenResponse.class);
-    }
+    return restTemplate.postForObject(properties.apiUrl(), entity, TokenResponse.class);
+  }
 }

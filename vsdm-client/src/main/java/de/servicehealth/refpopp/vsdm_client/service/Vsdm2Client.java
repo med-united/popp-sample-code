@@ -39,19 +39,12 @@ import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
 import de.gematik.zeta.sdk.storage.InMemoryStorage;
 import de.gematik.zeta.sdk.storage.StorageConfig;
 import de.servicehealth.refpopp.vsdm_client.properties.VsdServerProperties;
-import io.ktor.client.plugins.logging.LogLevel;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import kotlin.Unit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,101 +57,99 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class Vsdm2Client {
 
-    public static final String POPP_TOKEN_HEADER_NAME = "PoPP";
+  public static final String POPP_TOKEN_HEADER_NAME = "PoPP";
 
-    private final VsdServerProperties vsdmServerProperties;
+  private final VsdServerProperties vsdmServerProperties;
 
-    private ZetaSdkClient zetaSdk;
+  private ZetaSdkClient zetaSdk;
 
-    @PostConstruct
-    public void init() {
-        zetaSdk =
-            ZetaSdk.INSTANCE.build(
-                vsdmServerProperties.apiUrl(),
-                new BuildConfig(
-                    "sample-vsdm-client",
-                    "0.4.0",
-                    "vsdm-zeta-client",
-                    new StorageConfig.Custom(new InMemoryStorage()),
-                    new TpmConfig() {
-                    },
-                    new AuthConfig(
-                        List.of("popp"),
-                        30L,
-                        true,
-                        getTokenProvider(),
-                        AttestationConfig.software(),
-                        ""),
-                    getPlatformProductId(),
-                    new ZetaHttpClientBuilder("").disableServerValidation(true).logging(ALL),
-                    null,
-                    null,
-                    null)
-            );
+  @PostConstruct
+  public void init() {
+    zetaSdk =
+        ZetaSdk.INSTANCE.build(
+            vsdmServerProperties.apiUrl(),
+            new BuildConfig(
+                "sample-vsdm-client",
+                "0.4.0",
+                "vsdm-zeta-client",
+                new StorageConfig.Custom(new InMemoryStorage()),
+                new TpmConfig() {},
+                new AuthConfig(
+                    List.of("popp"),
+                    30L,
+                    true,
+                    getTokenProvider(),
+                    AttestationConfig.software(),
+                    ""),
+                getPlatformProductId(),
+                new ZetaHttpClientBuilder("").disableServerValidation(true).logging(ALL),
+                null,
+                null,
+                null));
+  }
+
+  private SubjectTokenProvider getTokenProvider() {
+    try {
+      Resource resource = new ClassPathResource("certificate/mock_smb.p12");
+      String path = resource.getFile().getAbsolutePath();
+      return new SmbTokenProvider(new SmbTokenProvider.Credentials(path, "smb-test", "", ""));
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load mock SM-B P12 certificate", e);
+    }
+  }
+
+  public String handleReadVsdRequest(String poppToken) {
+    String response;
+
+    Map<String, String> headers = new HashMap<>();
+    if (poppToken != null) {
+      headers.put(POPP_TOKEN_HEADER_NAME, poppToken);
+    }
+    // The VSDM mock only provides FHIR bundles in XML format.
+    headers.put("Accept", APPLICATION_XML_VALUE);
+
+    log.info("Attempting to fetch FHIR bundle from URL: {}", vsdmServerProperties.apiUrl());
+
+    try (ZetaHttpClient httpClient =
+        zetaSdk.httpClient(
+            it -> {
+              it.logging(ALL);
+              it.disableServerValidation(true);
+              return Unit.INSTANCE;
+            })) {
+      response =
+          HttpClientExtension.getAsync(httpClient, vsdmServerProperties.apiUrl(), headers)
+              .thenCompose(HttpClientExtension::bodyAsText)
+              .whenComplete(
+                  (body, ex) -> {
+                    if (ex != null) {
+                      log.error("Http Get failed", ex);
+                    } else {
+                      log.info("Body: {}", body);
+                    }
+                  })
+              .toCompletableFuture()
+              .join();
     }
 
-    private SubjectTokenProvider getTokenProvider() {
-        try {
-            Resource resource = new ClassPathResource("certificate/mock_smb.p12");
-            String path = resource.getFile().getAbsolutePath();
-            return new SmbTokenProvider(new SmbTokenProvider.Credentials(path, "smb-test", "", ""));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load mock SM-B P12 certificate", e);
-        }
+    return response;
+  }
+
+  @PreDestroy
+  public void destroy() {
+    ZetaSdkClientExtension.close(zetaSdk);
+  }
+
+  private PlatformProductId getPlatformProductId() {
+    String os = System.getProperty("os.name").toLowerCase();
+
+    if (os.contains("win")) {
+      return new PlatformProductId.WindowsProductId("windows", "storeId", "");
+    } else if (os.contains("mac")) {
+      return new PlatformProductId.AppleProductId("apple", "macos", List.of());
+    } else if (os.contains("nux")) {
+      return new PlatformProductId.LinuxProductId("linux", "storeId", "", "");
     }
-
-    public String handleReadVsdRequest(String poppToken) {
-        String response;
-
-        Map<String, String> headers = new HashMap<>();
-        if (poppToken != null) {
-            headers.put(POPP_TOKEN_HEADER_NAME, poppToken);
-        }
-        // The VSDM mock only provides FHIR bundles in XML format.
-        headers.put("Accept", APPLICATION_XML_VALUE);
-
-        log.info("Attempting to fetch FHIR bundle from URL: {}", vsdmServerProperties.apiUrl());
-
-        try (ZetaHttpClient httpClient =
-                 zetaSdk.httpClient(
-                     it -> {
-                         it.logging(ALL);
-                         it.disableServerValidation(true);
-                         return Unit.INSTANCE;
-                     })) {
-            response =
-                HttpClientExtension.getAsync(httpClient, vsdmServerProperties.apiUrl(), headers)
-                    .thenCompose(HttpClientExtension::bodyAsText)
-                    .whenComplete(
-                        (body, ex) -> {
-                            if (ex != null) {
-                                log.error("Http Get failed", ex);
-                            } else {
-                                log.info("Body: {}", body);
-                            }
-                        })
-                    .toCompletableFuture()
-                    .join();
-        }
-
-        return response;
-    }
-
-    @PreDestroy
-    public void destroy() {
-        ZetaSdkClientExtension.close(zetaSdk);
-    }
-
-    private PlatformProductId getPlatformProductId() {
-        String os = System.getProperty("os.name").toLowerCase();
-
-        if (os.contains("win")) {
-            return new PlatformProductId.WindowsProductId("windows", "storeId", "");
-        } else if (os.contains("mac")) {
-            return new PlatformProductId.AppleProductId("apple", "macos", List.of());
-        } else if (os.contains("nux")) {
-            return new PlatformProductId.LinuxProductId("linux", "storeId", "", "");
-        }
-        throw new RuntimeException("Unsupported OS: " + os);
-    }
+    throw new RuntimeException("Unsupported OS: " + os);
+  }
 }

@@ -32,27 +32,27 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class VsdService {
 
-    private final VsdmConverter vsdmConverter;
-    private final Vsdm2Client vsdm2Client;
+  private final VsdmConverter vsdmConverter;
+  private final Vsdm2Client vsdm2Client;
 
-    public ReadVSDResponse processReadVsd(String poppToken) {
-        log.info("Processing ReadVSD request in the service layer.");
-        try {
-            // Step 1: Call the VSDM 2.0 backend (mock) with the PoPP token
-            String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
+  public ReadVSDResponse processReadVsd(String poppToken) {
+    log.info("Processing ReadVSD request in the service layer.");
+    try {
+      // Step 1: Call the VSDM 2.0 backend (mock) with the PoPP token
+      String fhirBundle = vsdm2Client.handleReadVsdRequest(poppToken);
 
-            // Step 2: Convert FHIR bundle to ReadVSDResponse
-            return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
-        } catch (Exception e) {
-            log.error("Error processing ReadVSD request", e);
+      // Step 2: Convert FHIR bundle to ReadVSDResponse
+      return vsdmConverter.createReadVSDResponse(fhirBundle, poppToken);
+    } catch (Exception e) {
+      log.error("Error processing ReadVSD request", e);
 
-            ReadVSDResponse errorResponse = new ReadVSDResponse();
-            VSDStatusType errorStatus = new VSDStatusType();
+      ReadVSDResponse errorResponse = new ReadVSDResponse();
+      VSDStatusType errorStatus = new VSDStatusType();
 
-            // Oder ein Gematik-spezifischer Fehlercode
-            errorStatus.setStatus("-1");
-            errorResponse.setVSDStatus(errorStatus);
-            return errorResponse;
-        }
+      // Oder ein Gematik-spezifischer Fehlercode
+      errorStatus.setStatus("-1");
+      errorResponse.setVSDStatus(errorStatus);
+      return errorResponse;
     }
+  }
 }
