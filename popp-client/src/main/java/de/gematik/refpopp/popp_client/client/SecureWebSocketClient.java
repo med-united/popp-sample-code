@@ -118,7 +118,7 @@ public class SecureWebSocketClient {
                     AttestationConfig.software(),
                     ""),
                 createPlatformProductId(),
-                new ZetaHttpClientBuilder("")
+                new ZetaHttpClientBuilder()
                     .disableServerValidation(disableServerValidation)
                     .logging(LogLevel.ALL),
                 null,

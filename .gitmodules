@@ -1,0 +1,3 @@
+[submodule "api-telematik"]
+	path = api-telematik
+	url = https://github.com/med-united/api-telematik.git

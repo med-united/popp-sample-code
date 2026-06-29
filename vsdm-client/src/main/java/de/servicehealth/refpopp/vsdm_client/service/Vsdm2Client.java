@@ -82,7 +82,7 @@ public class Vsdm2Client {
                     AttestationConfig.software(),
                     ""),
                 getPlatformProductId(),
-                new ZetaHttpClientBuilder("").disableServerValidation(true).logging(ALL),
+                new ZetaHttpClientBuilder().disableServerValidation(true).logging(ALL),
                 null,
                 null,
                 null));

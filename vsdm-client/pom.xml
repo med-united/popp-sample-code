@@ -80,7 +80,6 @@
         <dependency>
             <groupId>de.gematik.zeta</groupId>
             <artifactId>zeta-sdk-jvm</artifactId>
-            <version>1.0.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.squareup.okhttp3</groupId>
