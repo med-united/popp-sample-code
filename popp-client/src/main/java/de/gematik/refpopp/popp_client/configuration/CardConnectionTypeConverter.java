@@ -29,6 +29,6 @@ public class CardConnectionTypeConverter implements Converter<String, CardConnec
 
   @Override
   public CardConnectionType convert(String source) {
-    return CardConnectionType.fromType(source);
+    return CardConnectionType.fromId(source);
   }
 }
