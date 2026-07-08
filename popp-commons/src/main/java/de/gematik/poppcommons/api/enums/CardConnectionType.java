@@ -26,20 +26,24 @@ import lombok.Getter;
 
 @Getter
 public enum CardConnectionType {
-  CONTACT_STANDARD("contact-standard", true),
-  CONTACTLESS_STANDARD("contactless-standard", true),
-  CONTACT_CONNECTOR("contact-connector", false),
-  CONTACTLESS_CONNECTOR("contactless-connector", false),
-  CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL("contact-connector-via-standard-terminal", true),
-  CONTACT_VIRTUAL("contact-virtual", false),
-  CONTACTLESS_VIRTUAL("contactless-virtual", false),
-  G3("g3", false),
-  UNKNOWN("unknown", false);
+  CONTACT_STANDARD("contact-standard", "contact-standard", true),
+  CONTACTLESS_STANDARD( "contactless-standard", "contactless-standard", true),
+  CONTACT_CONNECTOR("contactless-connector","contactless-connector", false),
+  CONTACTLESS_CONNECTOR("contactless-connector","contactless-connector", false),
+  // This type behaves just like contactless connector but is to be used with contact card. This allows for communication without secure channel
+  CONTACT_COMPAT_CONNECTOR("contact-compat-connector","contactless-connector", false),
+  CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL("contact-connector-via-standard-terminal","contact-connector-via-standard-terminal", true),
+  CONTACT_VIRTUAL("contact-virtual","contact-virtual", false),
+  CONTACTLESS_VIRTUAL("contactless-virtual","contactless-virtual", false),
+  G3("g3","g3", false),
+  UNKNOWN("unknown","unknown", false);
 
+  private final String id;
   private final String type;
   private final boolean needsCardReader;
 
-  CardConnectionType(String type, boolean needsCardReader) {
+  CardConnectionType(String id, String type, boolean needsCardReader) {
+    this.id = id;
     this.type = type;
     this.needsCardReader = needsCardReader;
   }
@@ -54,9 +58,9 @@ public enum CardConnectionType {
   }
 
   @JsonCreator
-  public static CardConnectionType fromType(String type) {
+  public static CardConnectionType fromId(String type) {
     for (CardConnectionType t : values()) {
-      if (t.type.equalsIgnoreCase(type)) {
+      if (t.id.equalsIgnoreCase(type)) {
         return t;
       }
     }

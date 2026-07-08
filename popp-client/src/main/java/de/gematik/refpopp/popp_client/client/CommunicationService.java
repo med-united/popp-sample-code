@@ -39,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -319,7 +320,7 @@ public class CommunicationService {
 
   private void validateConnectionCompatibility(final CardConnectionType cardConnectionType) {
     if (cardCommunicationService.getCardChannel().isEmpty()
-        && cardConnectionType != CardConnectionType.CONTACT_CONNECTOR) {
+        && !Set.of(CardConnectionType.CONTACT_CONNECTOR, CardConnectionType.CONTACT_COMPAT_CONNECTOR).contains(cardConnectionType)) {
       throw new IllegalStateException("No card inserted.");
     } else if (cardConnectionType.equals(CardConnectionType.CONTACT_STANDARD)
         || cardConnectionType.equals(CardConnectionType.CONTACT_CONNECTOR)) {
