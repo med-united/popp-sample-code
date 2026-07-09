@@ -28,7 +28,7 @@ import lombok.Getter;
 public enum CardConnectionType {
   CONTACT_STANDARD("contact-standard", "contact-standard", true),
   CONTACTLESS_STANDARD( "contactless-standard", "contactless-standard", true),
-  CONTACT_CONNECTOR("contactless-connector","contactless-connector", false),
+  CONTACT_CONNECTOR("contact-connector","contact-connector", false),
   CONTACTLESS_CONNECTOR("contactless-connector","contactless-connector", false),
   // This type behaves just like contactless connector but is to be used with contact card. This allows for communication without secure channel
   CONTACT_COMPAT_CONNECTOR("contact-compat-connector","contactless-connector", false),
