@@ -54,3 +54,6 @@ federation:
 logging:
   level:
     de.gematik.zeta: DEBUG
+  structured:
+    format:
+      console: ${LOG_FORMAT:}
