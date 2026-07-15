@@ -134,9 +134,9 @@ public class SecureWebSocketClient {
             ZetaSdk.INSTANCE.build(
                 serverUri.toString(),
                 new BuildConfig(
-                    "demo-client",
+                    "service-health-popp",
                     "0.2.0",
-                    "sdk-client",
+                    "service-health-popp-client",
                     new StorageConfig.Custom(new InMemoryStorage()),
                     new TpmConfig() {},
                     new AuthConfig(
