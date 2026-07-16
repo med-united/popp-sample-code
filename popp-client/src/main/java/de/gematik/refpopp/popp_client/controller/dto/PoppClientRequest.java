@@ -58,4 +58,13 @@ public record PoppClientRequest(
                 """,
             example = "IMG_eGK_G21_TU_root6 1.xml",
             nullable = true)
-        String virtualCard) {}
+        String virtualCard,
+    @Schema(
+            description =
+                """
+                Optional PatientId (Krankenversichertennummer).
+                Used for communicationType 'connector' as an alternative to CONNECTOR_TERMINAL_CONFIGURATION_CT_ID and CONNECTOR_TERMINAL_CONFIGURATION_SLOT.
+                """,
+            example = "X123456789",
+            nullable = true)
+        PatientId patientId) {}

@@ -23,20 +23,10 @@ package de.gematik.refpopp.popp_client.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-import de.gematik.openhealth.healthcard.*;
+import de.gematik.openhealth.healthcard.SecureChannel;
 import de.gematik.poppcommons.api.enums.CardConnectionType;
 import de.gematik.poppcommons.api.messages.PoPPMessage;
 import de.gematik.poppcommons.api.messages.ScenarioResponseMessage;
@@ -46,15 +36,16 @@ import de.gematik.refpopp.popp_client.cardreader.card.CardCommunicationService;
 import de.gematik.refpopp.popp_client.cardreader.card.VirtualCardService;
 import de.gematik.refpopp.popp_client.cardreader.card.VirtualCardServiceFactory;
 import de.gematik.refpopp.popp_client.cardreader.card.VirtualCardSessionState;
-import de.gematik.refpopp.popp_client.client.events.TextMessageReceivedEvent;
+import de.gematik.refpopp.popp_client.client.protocol.ConnectorScenarioProcessor;
+import de.gematik.refpopp.popp_client.client.protocol.PoPPMessageHandler;
+import de.gematik.refpopp.popp_client.client.protocol.StandardScenarioProcessor;
+import de.gematik.refpopp.popp_client.client.session.CommunicationSessionRegistry;
+import de.gematik.refpopp.popp_client.client.session.CommunicationSslSession;
+import de.gematik.refpopp.popp_client.client.transport.ClientServerCommunicationService;
+import de.gematik.refpopp.popp_client.client.transport.events.TextMessageReceivedEvent;
 import de.gematik.refpopp.popp_client.connector.ConnectorCommunicationServiceWrapper;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import de.gematik.refpopp.popp_client.connector.session.ConnectorSessionLifecycle;
+import java.util.*;
 import javax.smartcardio.CardChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,20 +58,38 @@ class CommunicationServiceTest {
   private ClientServerCommunicationService clientServerCommunicationServiceMock;
   private CardCommunicationService cardCommunicationServiceMock;
   private ConnectorCommunicationServiceWrapper connectorCommunicationServiceWrapper;
+  private CommunicationSessionRegistry sessionRegistry;
+  private StandardScenarioProcessor standardScenarioProcessor;
+  private ConnectorScenarioProcessor connectorScenarioProcessor;
+  private ConnectorSessionLifecycle connectorSessionLifecycle;
+  private PoPPMessageHandler poPPMessageHandler;
   private ObjectMapper mapper;
-  private Map<String, CompletableFuture<String>> tokenQueue;
   private VirtualCardService virtualCardServiceMock;
   private VirtualCardServiceFactory virtualCardServiceFactoryMock;
 
   @BeforeEach
-  void setUp() throws NoSuchFieldException, IllegalAccessException {
+  void setUp() {
     clientServerCommunicationServiceMock = mock(ClientServerCommunicationService.class);
     mapper = new ObjectMapper();
     cardCommunicationServiceMock = mock(CardCommunicationService.class);
     connectorCommunicationServiceWrapper = mock(ConnectorCommunicationServiceWrapper.class);
-    tokenQueue = new ConcurrentHashMap<>();
+    sessionRegistry = new CommunicationSessionRegistry();
     virtualCardServiceMock = mock(VirtualCardService.class);
     virtualCardServiceFactoryMock = mock(VirtualCardServiceFactory.class);
+    standardScenarioProcessor =
+        new StandardScenarioProcessor(
+            cardCommunicationServiceMock, virtualCardServiceMock, sessionRegistry);
+    connectorScenarioProcessor =
+        new ConnectorScenarioProcessor(
+            mapper, connectorCommunicationServiceWrapper, standardScenarioProcessor);
+    connectorSessionLifecycle = new ConnectorSessionLifecycle(connectorCommunicationServiceWrapper);
+    poPPMessageHandler =
+        new PoPPMessageHandler(
+            clientServerCommunicationServiceMock,
+            sessionRegistry,
+            standardScenarioProcessor,
+            connectorScenarioProcessor,
+            connectorSessionLifecycle);
     when(virtualCardServiceFactoryMock.create(anyString())).thenReturn(virtualCardServiceMock);
     when(virtualCardServiceMock.isConfigured()).thenReturn(true);
 
@@ -94,12 +103,11 @@ class CommunicationServiceTest {
             mapper,
             cardCommunicationServiceMock,
             clientServerCommunicationServiceMock,
-            connectorCommunicationServiceWrapper,
             virtualCardServiceMock,
-            virtualCardServiceFactoryMock);
-    final var tokenQueueField = CommunicationService.class.getDeclaredField("tokenQueue");
-    tokenQueueField.setAccessible(true);
-    tokenQueueField.set(sut, tokenQueue);
+            virtualCardServiceFactoryMock,
+            sessionRegistry,
+            connectorSessionLifecycle,
+            poPPMessageHandler);
   }
 
   private void mockImmediateTokenResponse() {
@@ -120,127 +128,158 @@ class CommunicationServiceTest {
     return new HashMap<>(Map.of("clientSessionId", sessionId, "cardConnectionType", type));
   }
 
+  private CommunicationSslSession wrapSslSession(final Map<String, Object> sslSession) {
+    return new CommunicationSslSession(sslSession);
+  }
+
   @Test
-  void startConnectsToWebSocketAndSendsStartMessage() {
+  void startConnectsToWebSocketAndSendsStartStandardCardReaderMessage() {
     final String clientSessionId = "1";
     Map<String, Object> ssl =
         prepareMockSslSession(clientSessionId, CardConnectionType.CONTACT_STANDARD);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     mockImmediateTokenResponse();
     var captor = ArgumentCaptor.forClass(PoPPMessage.class);
 
-    sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
+    sut.startStandardCardReader(CardConnectionType.CONTACT_STANDARD, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.CONTACT_STANDARD);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
   }
 
   @Test
-  void startConnectsToWebSocketAndSendsStartMessageWithConnectorSessionId() {
-    String clientSessionId = UUID.randomUUID().toString();
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+  void
+      startWithConnectorConnectsToWebSocketAndSendsStartStandardCardReaderMessageWithConnectorSessionId() {
+    final String kvnr = "X110629641";
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard(kvnr)).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk"))
         .thenReturn("connector-session");
-    Map<String, Object> ssl =
-        prepareMockSslSession("connector-session", CardConnectionType.CONTACT_CONNECTOR);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    Map<String, Object> ssl = new HashMap<>();
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     mockImmediateTokenResponse();
     var captor = ArgumentCaptor.forClass(PoPPMessage.class);
 
-    sut.start(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
+    sut.startWithConnector(CardConnectionType.CONTACT_CONNECTOR, kvnr);
 
-    // then
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.CONTACT_CONNECTOR);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
     assertThat(((StartMessage) captor.getValue()).getClientSessionId())
         .isEqualTo("connector-session");
+    verify(connectorCommunicationServiceWrapper).getConnectedEgkCard(kvnr);
+    verify(connectorCommunicationServiceWrapper).stopCardSession("connector-session");
   }
 
   @Test
-  void startConnectsToWebSocketAndSendsStartMessageWithEmptyClientSessionId() {
+  void startWithConnectorForwardsNullKvnrToConnectorLookup() {
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard(null)).thenReturn("egk");
+    when(connectorCommunicationServiceWrapper.startCardSession("egk"))
+        .thenReturn("connector-session");
+    final var ssl = new HashMap<String, Object>();
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
+
+    mockImmediateTokenResponse();
+
+    String token = sut.startWithConnector(CardConnectionType.CONTACT_CONNECTOR, null);
+
+    assertThat(token).isEqualTo("dummy-token");
+    verify(connectorCommunicationServiceWrapper).getConnectedEgkCard(null);
+    verify(connectorCommunicationServiceWrapper).startCardSession("egk");
+    verify(connectorCommunicationServiceWrapper).stopCardSession("connector-session");
+  }
+
+  @Test
+  void startConnectsToWebSocketAndGeneratesSessionIdForEmptyClientSessionId() {
     final String clientSessionId = "";
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
-    when(connectorCommunicationServiceWrapper.startCardSession("egk")).thenReturn("connectorUUID");
     Map<String, Object> ssl =
-        prepareMockSslSession("connectorUUID", CardConnectionType.CONTACT_CONNECTOR);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+        prepareMockSslSession("initial-session", CardConnectionType.CONTACT_CONNECTOR);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     mockImmediateTokenResponse();
     final var captor = ArgumentCaptor.forClass(PoPPMessage.class);
 
-    sut.start(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
+    sut.startStandardCardReader(CardConnectionType.CONTACT_CONNECTOR, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.CONTACT_CONNECTOR);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
-    assertThat(((StartMessage) captor.getValue()).getClientSessionId()).isEqualTo("connectorUUID");
+    assertThat(((StartMessage) captor.getValue()).getClientSessionId())
+        .isEqualTo(ssl.get("clientSessionId"));
+    assertThat(((StartMessage) captor.getValue()).getClientSessionId()).isNotBlank();
+    verify(connectorCommunicationServiceWrapper)
+        .stopCardSession(((StartMessage) captor.getValue()).getClientSessionId());
   }
 
   @Test
-  void startConnectsToWebSocketAndSendsStartMessageWithContactStandardAndClientSessionId() {
+  void
+      startConnectsToWebSocketAndSendsStartStandardCardReaderMessageWithContactStandardAndClientSessionId() {
     final String clientSessionId = UUID.randomUUID().toString();
     Map<String, Object> ssl =
         prepareMockSslSession(clientSessionId, CardConnectionType.CONTACT_STANDARD);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     mockImmediateTokenResponse();
     final var captor = ArgumentCaptor.forClass(PoPPMessage.class);
 
-    sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
+    sut.startStandardCardReader(CardConnectionType.CONTACT_STANDARD, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.CONTACT_STANDARD);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     assertThat(captor.getValue()).isInstanceOf(StartMessage.class);
     assertThat(((StartMessage) captor.getValue()).getClientSessionId()).isEqualTo(clientSessionId);
   }
 
   @Test
-  void startSendsStartMessageIfAlreadyConnectedToServer() {
+  void startSendsStartStandardCardReaderMessageIfAlreadyConnectedToServer() {
     final String clientSessionId = "123456";
     final var captor = ArgumentCaptor.forClass(PoPPMessage.class);
     Map<String, Object> ssl =
         prepareMockSslSession(clientSessionId, CardConnectionType.CONTACT_STANDARD);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     mockImmediateTokenResponse();
 
-    sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId);
+    sut.startStandardCardReader(CardConnectionType.CONTACT_STANDARD, clientSessionId);
 
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.CONTACT_STANDARD);
     verify(clientServerCommunicationServiceMock).sendMessage(captor.capture());
     final StartMessage message = (StartMessage) captor.getValue();
     assertThat(message.getClientSessionId()).isEqualTo(clientSessionId);
   }
 
   @Test
-  void startContactStandardWithSecureChannel() {
+  void startStandardCardReaderContactStandardWithSecureChannel() {
     final String clientSessionId = UUID.randomUUID().toString();
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(new HashMap<>());
+    final var ssl = new HashMap<String, Object>();
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     final var secureChannelMock = mock(SecureChannel.class);
     when(cardCommunicationServiceMock.getSecureChannel())
         .thenReturn(Optional.of(secureChannelMock));
 
-    assertThatThrownBy(() -> sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId))
+    assertThatThrownBy(
+            () -> sut.startStandardCardReader(CardConnectionType.CONTACT_STANDARD, clientSessionId))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Contact connection requested but card is contactless.");
   }
 
   @Test
-  void startContactStandardWithSecureChannelThrowsException() {
+  void startStandardCardReaderContactStandardWithSecureChannelThrowsException() {
+    final var ssl = new HashMap<String, Object>();
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
+
     final var secureChannelMock = mock(SecureChannel.class);
     when(cardCommunicationServiceMock.getSecureChannel())
         .thenReturn(Optional.of(secureChannelMock));
 
-    assertThatThrownBy(() -> sut.start(CardConnectionType.CONTACT_STANDARD, null))
+    assertThatThrownBy(() -> sut.startStandardCardReader(CardConnectionType.CONTACT_STANDARD, null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Contact connection requested but card is contactless.");
   }
 
   @Test
-  void startVirtualCardConnectsToWebSocketAndSendsStartMessage() {
+  void startVirtualCardConnectsToWebSocketAndSendsStartStandardCardReaderMessage() {
     Map<String, Object> ssl = spy(new HashMap<>(Map.of("clientSessionId", "mock-session")));
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     doAnswer(
             inv -> {
@@ -257,7 +296,7 @@ class CommunicationServiceTest {
             CardConnectionType.CONTACT_STANDARD, "mock-session", "random/image/path");
 
     assertThat(token).isEqualTo("mock-token");
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.CONTACT_STANDARD);
     verify(ssl).put("virtualCard", true);
     verify(ssl).put("cardConnectionType", CardConnectionType.CONTACT_STANDARD);
   }
@@ -283,7 +322,8 @@ class CommunicationServiceTest {
 
     final Map<String, Object> sslSession =
         new HashMap<>(Map.of("virtualCard", true, "clientSessionId", "session-1"));
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(sslSession);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(sslSession));
     when(virtualCardServiceMock.process(anyList(), any(VirtualCardSessionState.class)))
         .thenReturn(List.of("9000"));
 
@@ -332,7 +372,8 @@ class CommunicationServiceTest {
     final var event = new TextMessageReceivedEvent(givenMessage);
     when(cardCommunicationServiceMock.process(anyList())).thenReturn(List.of("data"));
     final Map<String, Object> sslSessionMock = Map.of();
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(sslSessionMock);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(new HashMap<>(sslSessionMock)));
 
     sut.handleServerEvent(event);
 
@@ -349,11 +390,12 @@ class CommunicationServiceTest {
     final var event = new TextMessageReceivedEvent(givenMessage);
 
     Map<String, Object> ssl = Map.of("clientSessionId", "dummy-session-id");
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(new HashMap<>(ssl)));
 
     sut.handleServerEvent(event);
 
-    verify(clientServerCommunicationServiceMock, times(2)).getSSLSession();
+    verify(clientServerCommunicationServiceMock).getSslSession();
     verifyNoInteractions(cardCommunicationServiceMock);
   }
 
@@ -370,10 +412,11 @@ class CommunicationServiceTest {
             CardConnectionType.CONTACT_CONNECTOR,
             "clientSessionId",
             "clientSessionId");
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(sslSessionMock);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(new HashMap<>(sslSessionMock)));
     sut.handleServerEvent(event);
 
-    verify(clientServerCommunicationServiceMock, times(2)).getSSLSession();
+    verify(clientServerCommunicationServiceMock).getSslSession();
     verify(connectorCommunicationServiceWrapper).stopCardSession("clientSessionId");
     verifyNoInteractions(cardCommunicationServiceMock);
   }
@@ -386,7 +429,8 @@ class CommunicationServiceTest {
         """;
     final var event = new TextMessageReceivedEvent(givenMessage);
     final Map<String, Object> sslSessionMock = Map.of();
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(sslSessionMock);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(new HashMap<>(sslSessionMock)));
 
     sut.handleServerEvent(event);
 
@@ -406,7 +450,8 @@ class CommunicationServiceTest {
         """;
     final var event = new TextMessageReceivedEvent(givenMessage);
     final Map<String, Object> sslSessionMock = Map.of("connectorMock", true);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(sslSessionMock);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(new HashMap<>(sslSessionMock)));
 
     sut.handleServerEvent(event);
 
@@ -422,14 +467,15 @@ class CommunicationServiceTest {
         """;
     final var event = new TextMessageReceivedEvent(givenMessage);
     final Map<String, Object> sslSessionMock = mock(Map.class);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(sslSessionMock);
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(sslSessionMock));
     when(sslSessionMock.get(anyString())).thenReturn(true);
 
     assertThatThrownBy(() -> sut.handleServerEvent(event))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Invalid token format");
 
-    verify(clientServerCommunicationServiceMock).getSSLSession();
+    verify(clientServerCommunicationServiceMock).getSslSession();
     verify(clientServerCommunicationServiceMock, never()).sendMessage(any());
   }
 
@@ -440,20 +486,22 @@ class CommunicationServiceTest {
         {"type":"Error","errorCode":"errorCode","errorDetail":"errorDetail"}
         """;
     final var event = new TextMessageReceivedEvent(givenMessage);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(Map.of());
+    final Map<String, Object> sslSession = Map.of();
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(wrapSslSession(new HashMap<>(sslSession)));
 
     sut.handleServerEvent(event);
 
-    verify(clientServerCommunicationServiceMock).getSSLSession();
+    verify(clientServerCommunicationServiceMock).getSslSession();
     verifyNoInteractions(cardCommunicationServiceMock);
   }
 
   @Test
-  void startCompletesWithServerErrorMessage() {
+  void startStandardCardReaderCompletesWithServerErrorMessage() {
     final String clientSessionId = "session-with-server-error";
     Map<String, Object> ssl =
         prepareMockSslSession(clientSessionId, CardConnectionType.CONTACT_STANDARD);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     doAnswer(
             inv -> {
               String errorMsg =
@@ -466,19 +514,22 @@ class CommunicationServiceTest {
         .when(clientServerCommunicationServiceMock)
         .sendMessage(any(PoPPMessage.class));
 
-    assertThatThrownBy(() -> sut.start(CardConnectionType.CONTACT_STANDARD, clientSessionId))
+    assertThatThrownBy(
+            () -> sut.startStandardCardReader(CardConnectionType.CONTACT_STANDARD, clientSessionId))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("Server error errorCode")
         .hasMessageContaining("UnknownCertificates");
 
-    assertThat(tokenQueue).doesNotContainKey(clientSessionId);
+    assertThat(sessionRegistry.hasPendingToken(clientSessionId)).isFalse();
   }
 
   @Test
   void handleServerEventProcessesErrorMessageWithoutQueuedToken() {
     final String clientSessionId = "session-without-token-future";
-    when(clientServerCommunicationServiceMock.getSSLSession())
-        .thenReturn(prepareMockSslSession(clientSessionId, CardConnectionType.CONTACT_STANDARD));
+    when(clientServerCommunicationServiceMock.getSslSession())
+        .thenReturn(
+            wrapSslSession(
+                prepareMockSslSession(clientSessionId, CardConnectionType.CONTACT_STANDARD)));
     final var event =
         new TextMessageReceivedEvent(
             """
@@ -487,8 +538,8 @@ class CommunicationServiceTest {
 
     sut.handleServerEvent(event);
 
-    assertThat(tokenQueue).doesNotContainKey(clientSessionId);
-    verify(clientServerCommunicationServiceMock).getSSLSession();
+    assertThat(sessionRegistry.hasPendingToken(clientSessionId)).isFalse();
+    verify(clientServerCommunicationServiceMock).getSslSession();
     verifyNoInteractions(cardCommunicationServiceMock);
   }
 
@@ -518,9 +569,9 @@ class CommunicationServiceTest {
   }
 
   @Test
-  void whenStartConnectorMock_thenConnectsAndReturnsToken() {
+  void whenStartStandardCardReaderConnectorMockThenConnectsAndReturnsToken() {
     Map<String, Object> ssl = spy(new HashMap<>(Map.of("clientSessionId", "mock-session")));
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     doAnswer(
             inv -> {
@@ -535,75 +586,64 @@ class CommunicationServiceTest {
     String token = sut.startConnectorMock("mock-session");
 
     assertThat(token).isEqualTo("mock-token");
-    verify(clientServerCommunicationServiceMock).connect();
+    verify(clientServerCommunicationServiceMock).connect(CardConnectionType.UNKNOWN);
     verify(ssl).put(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK, true);
   }
 
   @Test
-  void whenContactConnectorAndInvalidClientSessionId_thenConnectorSessionIsUsed() {
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+  void whenContactConnectorAndInvalidClientSessionIdThenConnectorSessionIsUsed() {
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard("kvnr")).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk"))
         .thenReturn("connector-session");
 
     Map<String, Object> ssl =
         prepareMockSslSession("connector-session", CardConnectionType.CONTACT_CONNECTOR);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     mockImmediateTokenResponse();
 
-    String token = sut.start(CardConnectionType.CONTACT_CONNECTOR, "not-a-uuid");
+    String token = sut.startStandardCardReader(CardConnectionType.CONTACT_CONNECTOR, "not-a-uuid");
 
     assertThat(token).isEqualTo("dummy-token");
   }
 
   @Test
-  void whenContactlessConnector_thenConnectorSessionIsUsed() {
-    when(connectorCommunicationServiceWrapper.getConnectedEgkCard()).thenReturn("egk");
+  void whenContactlessConnectorThenConnectorSessionIsUsed() {
+    when(connectorCommunicationServiceWrapper.getConnectedEgkCard("kvnr")).thenReturn("egk");
     when(connectorCommunicationServiceWrapper.startCardSession("egk"))
         .thenReturn("connector-session");
 
-    Map<String, Object> ssl =
-        prepareMockSslSession("connector-session", CardConnectionType.CONTACTLESS_CONNECTOR);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    Map<String, Object> ssl = new HashMap<>();
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     when(cardCommunicationServiceMock.getSecureChannel())
         .thenReturn(Optional.of(mock(SecureChannel.class)));
 
     mockImmediateTokenResponse();
 
-    String token =
-        sut.start(CardConnectionType.CONTACTLESS_CONNECTOR, UUID.randomUUID().toString());
+    String token = sut.startWithConnector(CardConnectionType.CONTACTLESS_CONNECTOR, "kvnr");
 
     assertThat(token).isEqualTo("dummy-token");
+    verify(connectorCommunicationServiceWrapper).getConnectedEgkCard(anyString());
     verify(connectorCommunicationServiceWrapper).startCardSession("egk");
     verify(connectorCommunicationServiceWrapper).stopCardSession("connector-session");
   }
 
-  //  @Test
-  //  void whenTokenIsNotReceivedWithinTimeout_thenRuntimeExceptionIsThrown() {
-  //    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(Map.of());
-  //    when(cardCommunicationServiceMock.getSecureChannel()).thenReturn(Optional.empty());
-  //
-  //    assertThatThrownBy(() -> sut.start(CardConnectionType.CONTACT_STANDARD, "session"))
-  //        .isInstanceOf(RuntimeException.class)
-  //        .hasMessageContaining("Token retrieval timed out");
-  //  }
-
   @Test
-  void whenTokenReceivedWithoutWaitingFuture_thenNoExceptionIsThrown() {
+  void whenTokenReceivedWithoutWaitingFutureThenNoExceptionIsThrown() {
     Map<String, Object> ssl = Map.of("clientSessionId", "missing-session");
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     sut.handleServerEvent(
         new TextMessageReceivedEvent("{\"type\":\"Token\",\"token\":\"t\",\"pn\":\"pn\"}"));
 
-    verify(clientServerCommunicationServiceMock, times(2)).getSSLSession();
+    verify(clientServerCommunicationServiceMock).getSslSession();
   }
 
   @Test
-  void whenStopConnectorSessionThrowsUnknownSession_thenExceptionIsIgnored() {
+  void whenStopConnectorSessionThrowsUnknownSessionThenExceptionIsIgnored() {
     Map<String, Object> ssl =
         prepareMockSslSession("session-id", CardConnectionType.CONTACT_CONNECTOR);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
 
     var fault = mock(org.springframework.ws.soap.client.SoapFaultClientException.class);
     when(fault.getFaultStringOrReason()).thenReturn("Unbekannte Session ID");
@@ -616,10 +656,10 @@ class CommunicationServiceTest {
   }
 
   @Test
-  void whenStopConnectorSessionThrowsOtherSoapFault_thenExceptionIsRethrown() {
+  void whenStopConnectorSessionThrowsOtherSoapFaultThenExceptionIsRethrown() {
     Map<String, Object> ssl =
         prepareMockSslSession("session-id", CardConnectionType.CONTACT_CONNECTOR);
-    when(clientServerCommunicationServiceMock.getSSLSession()).thenReturn(ssl);
+    when(clientServerCommunicationServiceMock.getSslSession()).thenReturn(wrapSslSession(ssl));
     var fault = mock(org.springframework.ws.soap.client.SoapFaultClientException.class);
     when(fault.getFaultStringOrReason()).thenReturn("Other error");
     doThrow(fault).when(connectorCommunicationServiceWrapper).stopCardSession("session-id");

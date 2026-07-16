@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import de.gematik.refpopp.popp_server.security.jwk.InvalidEcKeyCoordinateException;
 import de.gematik.refpopp.popp_server.security.jwk.JwkKidGenerator;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -326,7 +327,7 @@ class SignedJwksServiceTest {
     given(jwkKidGenerator.generate(poppTokenPublicKey)).willReturn("popp-kid");
 
     assertThatThrownBy(() -> service.create())
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidEcKeyCoordinateException.class)
         .hasMessageContaining("Coordinate too large");
   }
 

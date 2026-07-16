@@ -38,10 +38,10 @@ public class ServiceEndpointProvider {
     return determineServiceEndpoint(cardServicePath);
   }
 
-  public String getEventServiceFullEndpoint() {
-    final var cardServicePath = servicePathExtractor.getEventServicePath();
+  public String getCardServiceFullEndpoint() {
+    final var eventServicePath = servicePathExtractor.getCardServicePath();
     return servicePathExtractor.getConnectorUrl()
-        + determineServiceEndpoint(cardServicePath).getEndpoint();
+        + determineServiceEndpoint(eventServicePath).getEndpoint();
   }
 
   public ServiceEndpoint getEventServiceEndpoint() {
@@ -49,10 +49,22 @@ public class ServiceEndpointProvider {
     return determineServiceEndpoint(eventServicePath);
   }
 
-  public String getCardServiceFullEndpoint() {
-    final var eventServicePath = servicePathExtractor.getCardServicePath();
+  public String getEventServiceFullEndpoint() {
+    final var cardServicePath = servicePathExtractor.getEventServicePath();
     return servicePathExtractor.getConnectorUrl()
-        + determineServiceEndpoint(eventServicePath).getEndpoint();
+        + determineServiceEndpoint(cardServicePath).getEndpoint();
+  }
+
+  public String getCertificateServiceFullEndpoint() {
+    final var certificateServicePath = servicePathExtractor.getCertificateServicePath();
+    return servicePathExtractor.getConnectorUrl()
+        + determineServiceEndpoint(certificateServicePath).getEndpoint();
+  }
+
+  public String getAuthSignatureServiceFullEndpoint() {
+    final var authSignatureServicePath = servicePathExtractor.getAuthSignatureServicePath();
+    return servicePathExtractor.getConnectorUrl()
+        + determineServiceEndpoint(authSignatureServicePath).getEndpoint();
   }
 
   private ServiceEndpoint determineServiceEndpoint(final ServicePath servicePath) {

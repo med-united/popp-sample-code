@@ -28,7 +28,6 @@ import de.gematik.refpopp.popp_client.connector.soap.SoapClient;
 import de.gematik.ws.conn.cardservice.v821.SecureSendAPDU;
 import de.gematik.ws.conn.cardservice.v821.SecureSendAPDUResponse;
 import java.util.List;
-import java.util.function.Supplier;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -48,8 +47,7 @@ public class SecureSendAPDUClient extends SoapClient {
       @Autowired(required = false) @Qualifier("httpClientWithBC") HttpClient httpClient) {
     super(
         cardServiceMarshaller,
-        (Supplier<String>)
-            () -> buildSoapAction(serviceEndpointProvider, SoapActions.SECURE_SEND_APDU),
+        () -> buildSoapAction(serviceEndpointProvider, SoapActions.SECURE_SEND_APDU),
         httpClient);
     this.serviceEndpointProvider = serviceEndpointProvider;
   }

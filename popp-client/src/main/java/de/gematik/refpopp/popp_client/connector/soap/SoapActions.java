@@ -28,7 +28,9 @@ public enum SoapActions {
   START_CARD_SESSION("http://ws.gematik.de/conn/CardService/v", "#StartCardSession"),
   SECURE_SEND_APDU("http://ws.gematik.de/conn/CardService/v", "#SecureSendAPDU"),
   STOP_CARD_SESSION("http://ws.gematik.de/conn/CardService/v", "#StopCardSession"),
-  ;
+  VERIFY_PIN("http://ws.gematik.de/conn/CardService/v", "#VerifyPin"),
+  READ_CARD_CERTIFICATE("http://ws.gematik.de/conn/CertificateService/v", "#ReadCardCertificate"),
+  EXTERNAL_AUTHENTICATE("http://ws.gematik.de/conn/SignatureService/v", "#ExternalAuthenticate");
 
   private final String serviceEndpoint;
   private final String command;

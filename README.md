@@ -13,9 +13,9 @@ The [eGK-Hash-Datenbank](https://gemspec.gematik.de/prereleases/Draft_PoPP_25_1/
 
 The PoPP-Client uses the following profile matrix:
 
-| Target group       | Spring profile | Config file | Default PoPP-Server URL | Notes |
-|--------------------|---|---|-------------------------|---|
-| RISE PoPP-Service  | none | `application.yaml` | Obtain the endpoint via the [gematik Anfrageportal](https://service.gematik.de/servicedesk/customer/portal/37) | Access requires allow-listing. |
+| Target group       | Spring profile | Config file | Default PoPP-Server URL                                                            | Notes |
+|--------------------|---|---|------------------------------------------------------------------------------------|---|
+| RISE PoPP-Service  | none | `application.yaml` | `wss://popp.dev.poppservice.de:443/popp/practitioner/api/v1/token-generation-ehc` | Access requires allow-listing. |
 | local PoPP-Service | `dev-local` | `application-dev-local.yaml` | `wss://popp-zeta-ingress:443/ws` | Used for the local Docker/ZETA stack. |
 
 ## Building and running the project locally
@@ -101,6 +101,8 @@ of dual-interface readers you must specify the full name to make sure that the r
 
 
 #### b) Konnektor
+
+When generating a PoPP token with your Konnektor, the SMC-B from your Konnektor will be used for the ZETA SDK communication.
 
 **Optional: Certificates for TLS**
 
@@ -445,11 +447,14 @@ With Request Body:
 ```json
 {
   "communicationType": "<one of the supported types>",
-  "clientSessionId": "<optional>"
+  "clientSessionId": "<optional>",
+  "patientId": "<optional>"
 }
 ```
 
-The request parameter `clientsessionid` is optional. If set, the `clientsessionid` will overwrite the Konnektor `clientsessionid` from `StartCardSession`
+The request parameter `clientsessionid` is optional. If set, the `clientsessionid` will overwrite the Konnektor `clientsessionid` from `StartCardSession`.
+For `communicationType` values `contact-connector` and `contactless-connector`, a specific eGK card can be selected by providing the optional `patientId` field in the `/token` request body. 
+Configured `ct-id`/`ct-slot` values take precedence over KVNR-based selection.
 
 The communication type must be one of the following:
 

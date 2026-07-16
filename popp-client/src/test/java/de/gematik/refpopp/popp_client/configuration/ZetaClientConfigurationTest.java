@@ -36,10 +36,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class ZetaClientConfigurationTest {
-  private final ZetaClientConfiguration sut = new ZetaClientConfiguration();
+  private final ZetaClientConfiguration sut = new ZetaClientConfiguration(null);
 
   @Test
-  void zetaSdkClientThrowsWhenKeyfileCannotBeRead() {
+  void zetaSdkClientP12ThrowsWhenKeyfileCannotBeRead() {
     final var mockConfig = mock(ZetaConfigProperties.class);
     final var mockAuthentication = mock(ZetaConfigProperties.Authentication.class);
     final var mockSmb = mock(ZetaConfigProperties.Smb.class);
@@ -57,7 +57,7 @@ class ZetaClientConfigurationTest {
     when(mockConfig.getHttpLogLevel()).thenReturn(LogLevel.NONE);
     final URI serverUri = URI.create("wss://example.com");
 
-    assertThatThrownBy(() -> sut.zetaSdkClient(serverUri, mockConfig))
+    assertThatThrownBy(() -> sut.zetaSdkClientP12(serverUri, mockConfig))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Can't read private key:");
   }

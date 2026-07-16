@@ -20,6 +20,7 @@
 
 package de.gematik.refpopp.popp_server.federation;
 
+import de.gematik.refpopp.popp_server.security.jwk.EcKeyCoordinateEncoder;
 import de.gematik.refpopp.popp_server.security.jwk.JwkKidGenerator;
 import java.math.BigInteger;
 import java.net.URI;

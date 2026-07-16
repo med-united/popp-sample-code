@@ -92,6 +92,38 @@ class ServiceEndpointProviderTest {
   }
 
   @Test
+  void callCertificateServiceFullEndpointAndCheckItIsLikeExpected() {
+    // given
+    final var servicePath = new ServicePath();
+    servicePath.setPath("/path");
+    servicePath.setVersion("version");
+    when(servicePathExtractorMock.getCertificateServicePath()).thenReturn(servicePath);
+    when(servicePathExtractorMock.getConnectorUrl()).thenReturn("https://127.0.0.1");
+
+    // when
+    final String endpoint = sut.getCertificateServiceFullEndpoint();
+
+    // then
+    assertThat(endpoint).isEqualTo("https://127.0.0.1/path");
+  }
+
+  @Test
+  void callAuthSignatureServiceFullEndpointAndCheckItIsLikeExpected() {
+    // given
+    final var servicePath = new ServicePath();
+    servicePath.setPath("/path");
+    servicePath.setVersion("version");
+    when(servicePathExtractorMock.getAuthSignatureServicePath()).thenReturn(servicePath);
+    when(servicePathExtractorMock.getConnectorUrl()).thenReturn("https://127.0.0.1");
+
+    // when
+    final String endpoint = sut.getAuthSignatureServiceFullEndpoint();
+
+    // then
+    assertThat(endpoint).isEqualTo("https://127.0.0.1/path");
+  }
+
+  @Test
   void callCardServiceFullEndpointAndCheckItIsLikeExpected() {
     // given
     final var servicePath = new ServicePath();

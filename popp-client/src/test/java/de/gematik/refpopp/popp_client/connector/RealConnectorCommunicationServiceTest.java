@@ -29,8 +29,13 @@ import static org.mockito.Mockito.when;
 import de.gematik.refpopp.popp_client.connector.cardservice.SecureSendAPDUClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.StartCardSessionClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.StopCardSessionClient;
+import de.gematik.refpopp.popp_client.connector.cardservice.VerifyPinClient;
+import de.gematik.refpopp.popp_client.connector.certificateservice.ReadCardCertificateClient;
 import de.gematik.refpopp.popp_client.connector.eventservice.DetermineCardHandleResponse;
 import de.gematik.refpopp.popp_client.connector.eventservice.GetCardsClient;
+import de.gematik.refpopp.popp_client.connector.signatureservice.ExternalAuthenticateClient;
+import de.gematik.ws.conn.cardservicecommon.v2.CardTypeType;
+import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
 import de.gematik.ws.conn.connectorcommon.v5.Status;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +48,9 @@ class RealConnectorCommunicationServiceTest {
   private StartCardSessionClient startCardSessionClientMock;
   private StopCardSessionClient stopCardSessionClientMock;
   private SecureSendAPDUClient secureSendAPDUClientMock;
+  private VerifyPinClient verifyPinClientMock;
+  private ReadCardCertificateClient readCardCertificateClientMock;
+  private ExternalAuthenticateClient externalAuthenticateClientMock;
 
   @BeforeEach
   void setUp() {
@@ -50,26 +58,35 @@ class RealConnectorCommunicationServiceTest {
     startCardSessionClientMock = mock(StartCardSessionClient.class);
     stopCardSessionClientMock = mock(StopCardSessionClient.class);
     secureSendAPDUClientMock = mock(SecureSendAPDUClient.class);
+    verifyPinClientMock = mock(VerifyPinClient.class);
+    readCardCertificateClientMock = mock(ReadCardCertificateClient.class);
+    externalAuthenticateClientMock = mock(ExternalAuthenticateClient.class);
     sut =
         new RealConnectorCommunicationService(
             getCardsClientMock,
             startCardSessionClientMock,
             stopCardSessionClientMock,
-            secureSendAPDUClientMock);
+            secureSendAPDUClientMock,
+            verifyPinClientMock,
+            readCardCertificateClientMock,
+            externalAuthenticateClientMock);
   }
 
   @Test
   void getConnectedEgkCardReturnsHandle() {
     // given
+    final var kvnr = "X110629641";
     final var determineCardHandleResponse = new DetermineCardHandleResponse();
     determineCardHandleResponse.setCardHandles(List.of("1234567890"));
-    when(getCardsClientMock.performGetCards()).thenReturn(determineCardHandleResponse);
+    when(getCardsClientMock.performGetCards(kvnr, CardTypeType.EGK))
+        .thenReturn(determineCardHandleResponse);
 
     // when
-    final var cardHandle = sut.getConnectedEgkCard();
+    final var cardHandle = sut.getConnectedEgkCard(kvnr);
 
     // then
     assertThat(cardHandle).isNotNull().isEqualTo("1234567890");
+    verify(getCardsClientMock).performGetCards(kvnr, CardTypeType.EGK);
   }
 
   @Test
@@ -77,16 +94,49 @@ class RealConnectorCommunicationServiceTest {
     // given
     final var determineCardHandleResponse = new DetermineCardHandleResponse();
     determineCardHandleResponse.setCardHandles(List.of());
-    when(getCardsClientMock.performGetCards()).thenReturn(determineCardHandleResponse);
+    when(getCardsClientMock.performGetCards("kvnr", CardTypeType.EGK))
+        .thenReturn(determineCardHandleResponse);
 
     // when / then
-    assertThatThrownBy(() -> sut.getConnectedEgkCard())
+    assertThatThrownBy(() -> sut.getConnectedEgkCard("kvnr"))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Error fetching EGK card response");
+        .hasMessageContaining("Error fetching GetCards response");
   }
 
   @Test
-  void startCardSessionReturnsSessionId() {
+  void getConnectedEgkCardForwardsNullKvnr() {
+    // given
+    final var determineCardHandleResponse = new DetermineCardHandleResponse();
+    determineCardHandleResponse.setCardHandles(List.of("1234567890"));
+    when(getCardsClientMock.performGetCards(null, CardTypeType.EGK))
+        .thenReturn(determineCardHandleResponse);
+
+    // when
+    final var cardHandle = sut.getConnectedEgkCard(null);
+
+    // then
+    assertThat(cardHandle).isEqualTo("1234567890");
+    verify(getCardsClientMock).performGetCards(null, CardTypeType.EGK);
+  }
+
+  @Test
+  void getConnectedSmcbCardReturnsHandle() {
+    // given
+    final var determineCardHandleResponse = new DetermineCardHandleResponse();
+    determineCardHandleResponse.setCardHandles(List.of("SMC-B-42"));
+    when(getCardsClientMock.performGetCards("", CardTypeType.SMC_B))
+        .thenReturn(determineCardHandleResponse);
+
+    // when
+    final var cardHandle = sut.getConnectedSmcbCard();
+
+    // then
+    assertThat(cardHandle).isNotNull().isEqualTo("SMC-B-42");
+    verify(getCardsClientMock).performGetCards("", CardTypeType.SMC_B);
+  }
+
+  @Test
+  void startStandardCardReaderCardSessionReturnsSessionId() {
     // given
     final var cardHandle = "1234567890";
     final var sessionId = "sessionId";
@@ -128,5 +178,56 @@ class RealConnectorCommunicationServiceTest {
     // then
     assertThat(result).isEqualTo(apdus);
     verify(secureSendAPDUClientMock).performSecureSendAPDU(signedScenario);
+  }
+
+  @Test
+  void verifyPinReturnsOk() {
+    // given
+    final var cardHandle = "cardHandle";
+    final var pinResponse = new PinResponseType();
+    final var status = new Status();
+    status.setResult("OK");
+    pinResponse.setStatus(status);
+    when(verifyPinClientMock.performVerifyPin(cardHandle)).thenReturn(pinResponse);
+
+    // when
+    final var result = sut.verifyPin(cardHandle);
+
+    // then
+    assertThat(result.getStatus().getResult()).isEqualTo(status.getResult());
+    verify(verifyPinClientMock).performVerifyPin(cardHandle);
+  }
+
+  @Test
+  void readCardCertificateReturnsCertificate() {
+    // given
+    final var cardHandle = "cardHandle";
+    final var certificate = new byte[] {0x00};
+    when(readCardCertificateClientMock.performReadCardCertificate(cardHandle))
+        .thenReturn(certificate);
+
+    // when
+    final var result = sut.readCardCertificate(cardHandle);
+
+    // then
+    assertThat(result).isEqualTo(certificate);
+    verify(readCardCertificateClientMock).performReadCardCertificate(cardHandle);
+  }
+
+  @Test
+  void externalAuthenticateReturnsSignature() {
+    // given
+    final var cardHandle = "cardHandle";
+    final var base64Challenge = "base64Challenge";
+    final var signature = new byte[] {0x00};
+    when(externalAuthenticateClientMock.performExternalAuthenticate(base64Challenge, cardHandle))
+        .thenReturn(signature);
+
+    // when
+    final var result = sut.externalAuthenticate(base64Challenge, cardHandle);
+
+    // then
+    assertThat(result).isEqualTo(signature);
+    verify(externalAuthenticateClientMock).performExternalAuthenticate(base64Challenge, cardHandle);
   }
 }
