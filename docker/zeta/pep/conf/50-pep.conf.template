@@ -1,10 +1,10 @@
 server {
     listen 80;
     server_name popp-zeta-pep;
-    location /ws {
+    location /popp/practitioner/api/v1/token-generation-ehc {
     # root /usr/share/nginx/html;
 
-    proxy_pass http://${POPP_SERVER_HOST}/ws;
+    proxy_pass http://${POPP_SERVER_HOST}/popp/practitioner/api/v1/token-generation-ehc;
 
     pep                  on;
     include /etc/nginx/templates/proxy_headers.conf;

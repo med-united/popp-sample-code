@@ -58,7 +58,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
   @Override
   public void registerWebSocketHandlers(final WebSocketHandlerRegistry registry) {
     log.debug("| Entering registerWebSocketHandlers()");
-    registry.addHandler(webSocketHandler(), "/ws");
+    registry.addHandler(webSocketHandler(), "/popp/practitioner/api/v1/token-generation-ehc");
     log.debug("| Exiting registerWebSocketHandlers()");
   }
 

@@ -70,26 +70,38 @@ public class GetCardsClient extends SoapClient {
     this.ctSlot = slot;
   }
 
-  public DetermineCardHandleResponse performGetCards() {
-    final GetCards soapRequest = createSoapRequestObject();
-    String endpoint = serviceEndpointProvider.getEventServiceFullEndpoint();
+  public DetermineCardHandleResponse performGetCards(String patientId, CardTypeType cardType) {
+    final var getCardsRequest = createSoapRequestObject(cardType);
+    var endpoint = serviceEndpointProvider.getEventServiceFullEndpoint();
     log.info("Sending GetCards request to connector at {}", endpoint);
     final GetCardsResponse soapResponse =
-        sendRequest(soapRequest, endpoint, GetCardsResponse.class);
+        sendRequest(getCardsRequest, endpoint, GetCardsResponse.class);
     final var determineCardHandleResponse = new DetermineCardHandleResponse();
 
+    boolean filterByPatientId = patientId != null && !patientId.isBlank();
+
     final var cardHandles =
-        soapResponse.getCards().getCard().stream().map(CardInfoType::getCardHandle).toList();
+        soapResponse.getCards().getCard().stream()
+            .filter(
+                cardInfoType -> {
+                  if (filterByPatientId) {
+                    return cardInfoType.getKvnr() != null
+                        && cardInfoType.getKvnr().equalsIgnoreCase(patientId);
+                  }
+                  return true;
+                })
+            .map(CardInfoType::getCardHandle)
+            .toList();
 
     determineCardHandleResponse.setCardHandles(cardHandles);
     return determineCardHandleResponse;
   }
 
-  private GetCards createSoapRequestObject() {
-    return createGetCards();
+  private GetCards createSoapRequestObject(CardTypeType cardType) {
+    return createGetCards(cardType);
   }
 
-  private GetCards createGetCards() {
+  private GetCards createGetCards(CardTypeType cardType) {
     final ContextType contextType = getContextType();
     final GetCards getCards = new GetCards();
     getCards.setContext(contextType);
@@ -99,7 +111,7 @@ public class GetCardsClient extends SoapClient {
         getCards.setSlotId(BigInteger.valueOf(ctSlot));
       }
     }
-    getCards.setCardType(CardTypeType.EGK);
+    getCards.setCardType(cardType);
 
     return getCards;
   }

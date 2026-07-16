@@ -87,7 +87,7 @@ class TokenControllerTest {
         .andExpect(content().json("{\"status\":\"OK\"}"));
 
     verify(communicationServiceMock)
-        .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
+        .startStandardCardReader(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
     verify(cardReaderServiceMock).startCheckForCardReader();
   }
 
@@ -106,8 +106,28 @@ class TokenControllerTest {
                 .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(content().json("{\"status\":\"OK\"}"));
+    verify(communicationServiceMock).startWithConnector(CardConnectionType.CONTACT_CONNECTOR, null);
+    verify(cardReaderServiceMock, never()).startCheckForCardReader();
+  }
+
+  @Test
+  void getTokenWithContactConnectorAndKvnrCallsProcess() throws Exception {
+    // given
+
+    // when / then
+    mockMvc
+        .perform(
+            post("/token")
+                .content(
+                    "{\"communicationType\": \""
+                        + CardConnectionType.CONTACT_CONNECTOR.getType()
+                        + "\", \"patientId\": \"X110629641\"}")
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(content().json("{\"status\":\"OK\"}"));
+
     verify(communicationServiceMock)
-        .start(CardConnectionType.CONTACT_CONNECTOR, EMPTY_CLIENT_SESSION_ID);
+        .startWithConnector(CardConnectionType.CONTACT_CONNECTOR, "X110629641");
     verify(cardReaderServiceMock, never()).startCheckForCardReader();
   }
 
@@ -150,7 +170,28 @@ class TokenControllerTest {
         .andExpect(content().json("{\"status\":\"OK\"}"));
 
     verify(communicationServiceMock)
-        .start(CardConnectionType.CONTACTLESS_CONNECTOR, EMPTY_CLIENT_SESSION_ID);
+        .startWithConnector(CardConnectionType.CONTACTLESS_CONNECTOR, null);
+    verify(cardReaderServiceMock, never()).startCheckForCardReader();
+  }
+
+  @Test
+  void getTokenWithContactlessConnectorAndKvnrCallsProcess() throws Exception {
+    // given
+
+    // when / then
+    mockMvc
+        .perform(
+            post("/token")
+                .content(
+                    "{\"communicationType\": \""
+                        + CardConnectionType.CONTACTLESS_CONNECTOR.getType()
+                        + "\", \"patientId\": \"A123456789\"}")
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(content().json("{\"status\":\"OK\"}"));
+
+    verify(communicationServiceMock)
+        .startWithConnector(CardConnectionType.CONTACTLESS_CONNECTOR, "A123456789");
     verify(cardReaderServiceMock, never()).startCheckForCardReader();
   }
 
@@ -171,7 +212,7 @@ class TokenControllerTest {
         .andExpect(content().json("{\"status\":\"OK\"}"));
 
     verify(communicationServiceMock)
-        .start(CardConnectionType.CONTACTLESS_STANDARD, EMPTY_CLIENT_SESSION_ID);
+        .startStandardCardReader(CardConnectionType.CONTACTLESS_STANDARD, EMPTY_CLIENT_SESSION_ID);
     verify(cardReaderServiceMock).startCheckForCardReader();
   }
 
@@ -215,7 +256,7 @@ class TokenControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().json("{\"status\":\"OK\"}"));
 
-    verify(communicationServiceMock).start(CardConnectionType.CONTACT_CONNECTOR, sessionId);
+    verify(communicationServiceMock).startWithConnector(CardConnectionType.CONTACT_CONNECTOR, null);
     verify(cardReaderServiceMock, never()).startCheckForCardReader();
   }
 
@@ -233,7 +274,7 @@ class TokenControllerTest {
         .andExpect(
             content().json("{\"status\":\"ERROR\",\"errorMessage\":\"G3 not yet implemented\"}"));
 
-    verify(communicationServiceMock, never()).start(any(), any());
+    verify(communicationServiceMock, never()).startStandardCardReader(any(), any());
     verify(cardReaderServiceMock, never()).startCheckForCardReader();
   }
 
@@ -253,7 +294,7 @@ class TokenControllerTest {
             content()
                 .json("{\"status\":\"ERROR\",\"errorMessage\":\"Unsupported type: UNKNOWN\"}"));
 
-    verify(communicationServiceMock, never()).start(any(), any());
+    verify(communicationServiceMock, never()).startStandardCardReader(any(), any());
   }
 
   @Test
@@ -265,7 +306,7 @@ class TokenControllerTest {
         .perform(get("/token/").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNotFound());
 
-    verify(communicationServiceMock, never()).start(any(), any());
+    verify(communicationServiceMock, never()).startStandardCardReader(any(), any());
   }
 
   @Test
@@ -273,7 +314,7 @@ class TokenControllerTest {
     // given
     Mockito.doThrow(new RuntimeException("Error during communication"))
         .when(communicationServiceMock)
-        .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
+        .startStandardCardReader(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
 
     // when / then
     mockMvc
@@ -292,14 +333,14 @@ class TokenControllerTest {
                         + " communication\"}"));
 
     verify(communicationServiceMock)
-        .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
+        .startStandardCardReader(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
   }
 
   @Test
   void getTokenReturnsGatewayTimeoutWhenTimeoutOccurs() throws Exception {
     Mockito.doThrow(new RuntimeException("wrapper", new java.util.concurrent.TimeoutException()))
         .when(communicationServiceMock)
-        .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
+        .startStandardCardReader(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
 
     mockMvc
         .perform(
@@ -322,7 +363,7 @@ class TokenControllerTest {
                         .trim()));
 
     verify(communicationServiceMock)
-        .start(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
+        .startStandardCardReader(CardConnectionType.CONTACT_STANDARD, EMPTY_CLIENT_SESSION_ID);
     verify(cardReaderServiceMock).startCheckForCardReader();
   }
 }

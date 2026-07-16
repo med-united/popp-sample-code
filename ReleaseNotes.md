@@ -5,7 +5,19 @@
 ### Known Issues
 - Standard-Kartenleser with Docker is not supported
 
-## Release 2.6.0
+## Release 2.7.0
+
+### added
+- Added support for selecting a specific eGK card via the optional `patientId` field in the `/token` request body.
+- Configured card terminal selection using `ct-id` and `ct-slot` takes precedence over the `patientId` request parameter.
+- Added support to send ReadCardCertificate, ExternalAuthenticate and VerifyPin requests
+- contact-connector now uses the SMC-B from the connector for the ZETA SDK setup
+- Updated ZETA version to 1.2.2
+
+### changed
+- Changed the local-dev Docker Compose WebSocket endpoint from `/ws` to `/popp/practitioner/api/v1/token-generation-ehc`
+
+## Release 2.5.2 + 2.6.0
 
 ### changed
 - Replaced hardcoded error code strings with error codes defined in the gemSpec_PoPP_Service specification.

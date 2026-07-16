@@ -29,7 +29,6 @@ import de.gematik.refpopp.popp_client.connector.soap.SoapClient;
 import de.gematik.ws.conn.cardservice.v821.StartCardSession;
 import de.gematik.ws.conn.cardservice.v821.StartCardSessionResponse;
 import de.gematik.ws.conn.connectorcontext.v2.ContextType;
-import java.util.function.Supplier;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -51,8 +50,7 @@ public class StartCardSessionClient extends SoapClient {
       @Autowired(required = false) @Qualifier("httpClientWithBC") HttpClient httpClient) {
     super(
         cardServiceMarshaller,
-        (Supplier<String>)
-            () -> buildSoapAction(serviceEndpointProvider, SoapActions.START_CARD_SESSION),
+        () -> buildSoapAction(serviceEndpointProvider, SoapActions.START_CARD_SESSION),
         httpClient);
     this.serviceEndpointProvider = serviceEndpointProvider;
     this.context = context;

@@ -47,7 +47,9 @@ class WebSocketConfigTest {
     webSocketConfig.registerWebSocketHandlers(registry);
 
     // then
-    verify(registry).addHandler(any(WebSocketHandler.class), eq("/ws"));
+    verify(registry)
+        .addHandler(
+            any(WebSocketHandler.class), eq("/popp/practitioner/api/v1/token-generation-ehc"));
   }
 
   @Test

@@ -88,7 +88,7 @@ services:
       popp-server:
         condition: service_healthy
   popp-zeta-pdp:
-    image: europe-west3-docker.pkg.dev/gematik-pt-zeta-prod/zeta-dcr/keycloak-zeta:1.2.1
+    image: europe-west3-docker.pkg.dev/gematik-pt-zeta-prod/zeta-dcr/keycloak-zeta:1.2.3
     environment:
       CHECK_CLIENT_ATTESTATION_ENABLED: true
       KC_BOOTSTRAP_ADMIN_USERNAME: admin

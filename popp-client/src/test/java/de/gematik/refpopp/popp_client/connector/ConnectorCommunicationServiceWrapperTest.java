@@ -23,10 +23,10 @@ package de.gematik.refpopp.popp_client.connector;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
-import de.gematik.refpopp.popp_client.client.ClientServerCommunicationService;
+import de.gematik.refpopp.popp_client.client.session.CommunicationSslSession;
+import de.gematik.refpopp.popp_client.client.transport.ClientServerCommunicationService;
 import de.gematik.ws.conn.connectorcommon.v5.Status;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,23 +43,35 @@ class ConnectorCommunicationServiceWrapperTest {
 
   @Mock MockConnectorCommunicationService mockConnectorCommunicationService;
 
-  @Mock Map<String, Object> sslSession;
+  @Mock CommunicationSslSession communicationSslSession;
 
   @InjectMocks ConnectorCommunicationServiceWrapper wrapper;
 
   @BeforeEach
   void setup() {
-    when(clientServerCommunicationService.getSSLSession()).thenReturn(sslSession);
+    when(clientServerCommunicationService.getSslSession()).thenReturn(communicationSslSession);
   }
 
   // -------- getConnectedEgkCard --------
 
   @Test
   void whenMockIsSet_thenMockServiceIsUsed_forGetConnectedEgkCard() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(true);
+    when(communicationSslSession.isConnectorMock()).thenReturn(true);
     when(mockConnectorCommunicationService.getConnectedEgkCard()).thenReturn("mock-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("kvnr");
+
+    assertEquals("mock-card", result);
+    verify(mockConnectorCommunicationService).getConnectedEgkCard();
+    verifyNoInteractions(realConnectorCommunicationService);
+  }
+
+  @Test
+  void whenMockIsSet_andKvnrIsNull_thenMockServiceIsUsed_forGetConnectedEgkCard() {
+    when(communicationSslSession.isConnectorMock()).thenReturn(true);
+    when(mockConnectorCommunicationService.getConnectedEgkCard()).thenReturn("mock-card");
+
+    String result = wrapper.getConnectedEgkCard(null);
 
     assertEquals("mock-card", result);
     verify(mockConnectorCommunicationService).getConnectedEgkCard();
@@ -68,56 +80,68 @@ class ConnectorCommunicationServiceWrapperTest {
 
   @Test
   void whenMockIsNotSet_thenRealServiceIsUsed_forGetConnectedEgkCard() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(false);
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(communicationSslSession.isConnectorMock()).thenReturn(false);
+    when(realConnectorCommunicationService.getConnectedEgkCard("kvnr")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("kvnr");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("kvnr");
+    verifyNoInteractions(mockConnectorCommunicationService);
+  }
+
+  @Test
+  void whenMockIsNotSet_andKvnrIsNull_thenRealServiceReceivesNullKvnr_forGetConnectedEgkCard() {
+    when(communicationSslSession.isConnectorMock()).thenReturn(false);
+    when(realConnectorCommunicationService.getConnectedEgkCard(null)).thenReturn("real-card");
+
+    String result = wrapper.getConnectedEgkCard(null);
+
+    assertEquals("real-card", result);
+    verify(realConnectorCommunicationService).getConnectedEgkCard(null);
     verifyNoInteractions(mockConnectorCommunicationService);
   }
 
   @Test
   void whenSslSessionIsMissing_thenRealServiceIsUsed_forGetConnectedEgkCard() {
-    when(clientServerCommunicationService.getSSLSession())
+    when(clientServerCommunicationService.getSslSession())
         .thenThrow(new RuntimeException("No SSL session"));
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(realConnectorCommunicationService.getConnectedEgkCard("kvnr")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("kvnr");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("kvnr");
   }
 
   @Test
   void whenSslAttributeIsNull_thenRealServiceIsUsed_forGetConnectedEgkCard() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(null);
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(communicationSslSession.isConnectorMock()).thenReturn(false);
+    when(realConnectorCommunicationService.getConnectedEgkCard("kvnr")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("kvnr");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("kvnr");
   }
 
   @Test
   void whenSslGetValueThrowsException_thenRealServiceIsUsed_forGetConnectedEgkCard() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK))
+    when(communicationSslSession.isConnectorMock())
         .thenThrow(new IllegalStateException("broken session"));
-    when(realConnectorCommunicationService.getConnectedEgkCard()).thenReturn("real-card");
+    when(realConnectorCommunicationService.getConnectedEgkCard("kvnr")).thenReturn("real-card");
 
-    String result = wrapper.getConnectedEgkCard();
+    String result = wrapper.getConnectedEgkCard("kvnr");
 
     assertEquals("real-card", result);
-    verify(realConnectorCommunicationService).getConnectedEgkCard();
+    verify(realConnectorCommunicationService).getConnectedEgkCard("kvnr");
   }
 
   // -------- startCardSession --------
 
   @Test
-  void whenMockIsSet_thenMockServiceIsUsed_forStartCardSession() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(true);
+  void whenMockIsSet_thenMockServiceIsUsed_forStartStandardCardReaderCardSession() {
+    when(communicationSslSession.isConnectorMock()).thenReturn(true);
     when(mockConnectorCommunicationService.startCardSession("card")).thenReturn("mock-session");
 
     String result = wrapper.startCardSession("card");
@@ -128,8 +152,8 @@ class ConnectorCommunicationServiceWrapperTest {
   }
 
   @Test
-  void whenMockIsNotSet_thenRealServiceIsUsed_forStartCardSession() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(false);
+  void whenMockIsNotSet_thenRealServiceIsUsed_forStartStandardCardReaderCardSession() {
+    when(communicationSslSession.isConnectorMock()).thenReturn(false);
     when(realConnectorCommunicationService.startCardSession("card")).thenReturn("real-session");
 
     String result = wrapper.startCardSession("card");
@@ -142,7 +166,7 @@ class ConnectorCommunicationServiceWrapperTest {
 
   @Test
   void whenMockIsSet_thenMockServiceIsUsed_forStopCardSession() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(true);
+    when(communicationSslSession.isConnectorMock()).thenReturn(true);
 
     Status status = new Status();
     when(mockConnectorCommunicationService.stopCardSession("session")).thenReturn(status);
@@ -155,7 +179,7 @@ class ConnectorCommunicationServiceWrapperTest {
 
   @Test
   void whenMockIsNotSet_thenRealServiceIsUsed_forStopCardSession() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(false);
+    when(communicationSslSession.isConnectorMock()).thenReturn(false);
 
     Status status = new Status();
     when(realConnectorCommunicationService.stopCardSession("session")).thenReturn(status);
@@ -170,7 +194,7 @@ class ConnectorCommunicationServiceWrapperTest {
 
   @Test
   void whenMockIsSet_thenMockServiceIsUsed_forSecureSendApdu() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(true);
+    when(communicationSslSession.isConnectorMock()).thenReturn(true);
 
     List<String> response = List.of("9000");
     when(mockConnectorCommunicationService.secureSendApdu("signed")).thenReturn(response);
@@ -183,7 +207,7 @@ class ConnectorCommunicationServiceWrapperTest {
 
   @Test
   void whenMockIsNotSet_thenRealServiceIsUsed_forSecureSendApdu() {
-    when(sslSession.get(ConnectorCommunicationServiceWrapper.CONNECTOR_MOCK)).thenReturn(false);
+    when(communicationSslSession.isConnectorMock()).thenReturn(false);
 
     List<String> response = List.of("9000");
     when(realConnectorCommunicationService.secureSendApdu("signed")).thenReturn(response);

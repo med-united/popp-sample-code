@@ -23,6 +23,7 @@ package de.gematik.refpopp.popp_client.controller;
 import de.gematik.poppcommons.api.enums.CardConnectionType;
 import de.gematik.refpopp.popp_client.cardreader.CardReader;
 import de.gematik.refpopp.popp_client.client.CommunicationService;
+import de.gematik.refpopp.popp_client.controller.dto.PatientId;
 import de.gematik.refpopp.popp_client.controller.dto.PoppClientRequest;
 import de.gematik.refpopp.popp_client.controller.dto.PoppClientResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +37,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/token")
@@ -140,17 +144,24 @@ public class TokenController {
   @PostMapping
   public ResponseEntity<PoppClientResponse> createToken(
       @Valid @RequestBody PoppClientRequest request) {
-    String clientSessionId = request.clientSessionId();
+    var clientSessionId = request.clientSessionId();
     log.info(
-        "| Started 'generate PoPP Token' with clientSessionId '{}' and communicationType" + " '{}'",
+        "| Started 'generate PoPP Token' with clientSessionId '{}', communicationType"
+            + " '{}'"
+            + "and patientId '{}'.",
         clientSessionId,
-        request.communicationType().getType());
+        request.communicationType().getType(),
+        request.patientId() == null ? "null" : request.patientId().value());
     try {
       if (request.communicationType().requiresCardReader()) {
         cardReaderService.startCheckForCardReader();
       }
-      String token =
-          startCommunication(request.communicationType(), clientSessionId, request.virtualCard());
+      var token =
+          startCommunication(
+              request.communicationType(),
+              clientSessionId,
+              request.virtualCard(),
+              request.patientId());
       log.info("| Finished 'generate PoPP Token' successfully");
       return ResponseEntity.ok(PoppClientResponse.ok(token));
     } catch (UnsupportedOperationException e) {
@@ -167,12 +178,15 @@ public class TokenController {
   }
 
   private String startCommunication(
-      CardConnectionType type, String clientSessionId, String imageFile) {
+      CardConnectionType type, String clientSessionId, String imageFile, PatientId patientId) {
     return switch (type) {
       case CONTACT_CONNECTOR_VIA_STANDARD_TERMINAL ->
           communicationService.startConnectorMock(clientSessionId);
-      case CONTACT_STANDARD, CONTACTLESS_STANDARD, CONTACT_CONNECTOR, CONTACTLESS_CONNECTOR ->
-          communicationService.start(type, clientSessionId);
+      case CONTACT_CONNECTOR, CONTACTLESS_CONNECTOR ->
+          communicationService.startWithConnector(
+              type, patientId == null ? null : patientId.value());
+      case CONTACT_STANDARD, CONTACTLESS_STANDARD ->
+          communicationService.startStandardCardReader(type, clientSessionId);
       case CONTACT_VIRTUAL ->
           communicationService.startVirtualCard(
               CardConnectionType.CONTACT_STANDARD, clientSessionId, imageFile);

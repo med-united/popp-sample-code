@@ -101,6 +101,58 @@ class ServicePathExtractorTest {
   }
 
   @Test
+  void getCertificateServicePath() {
+    // given
+    final var connectorServicesMock = mock(ConnectorServices.class, RETURNS_DEEP_STUBS);
+    when(connectorServicesFactoryMock.createConnectorServices()).thenReturn(connectorServicesMock);
+    final var serviceType = new ServiceType();
+    serviceType.setName("CertificateService");
+    final var versionsType = new VersionsType();
+    final var versionType = new VersionType();
+    versionType.setVersion("version");
+    serviceType.setVersions(versionsType);
+    final var endpointType = new EndpointType();
+    endpointType.setLocation("location");
+    versionType.setEndpoint(endpointType);
+    versionsType.getVersion().add(versionType);
+    when(connectorServicesMock.getServiceInformation().getService())
+        .thenReturn(List.of(serviceType));
+
+    // when
+    final var result = sut.getCertificateServicePath();
+
+    // then
+    assertThat(result).isNotNull();
+    assertThat(result.getPath()).isEqualTo("location");
+  }
+
+  @Test
+  void getAuthSignatureServicePath() {
+    // given
+    final var connectorServicesMock = mock(ConnectorServices.class, RETURNS_DEEP_STUBS);
+    when(connectorServicesFactoryMock.createConnectorServices()).thenReturn(connectorServicesMock);
+    final var serviceType = new ServiceType();
+    serviceType.setName("AuthSignatureService");
+    final var versionsType = new VersionsType();
+    final var versionType = new VersionType();
+    versionType.setVersion("version");
+    serviceType.setVersions(versionsType);
+    final var endpointType = new EndpointType();
+    endpointType.setLocation("location");
+    versionType.setEndpoint(endpointType);
+    versionsType.getVersion().add(versionType);
+    when(connectorServicesMock.getServiceInformation().getService())
+        .thenReturn(List.of(serviceType));
+
+    // when
+    final var result = sut.getAuthSignatureServicePath();
+
+    // then
+    assertThat(result).isNotNull();
+    assertThat(result.getPath()).isEqualTo("location");
+  }
+
+  @Test
   void getCardServicePathWithTlsEndpoint() {
     // given
     ServicePathExtractor secureServicePathExtractor =

@@ -7,7 +7,7 @@
   <parent>
     <groupId>de.gematik.refpopp</groupId>
     <artifactId>popp-example-impl-global</artifactId>
-    <version>2.6.0</version>
+    <version>2.7.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -118,17 +118,17 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <version>1.84</version>
+      <version>1.85</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.84</version>
+      <version>1.85</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bctls-jdk18on</artifactId>
-      <version>1.84</version>
+      <version>1.85</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -137,7 +137,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5</artifactId>
-      <version>5.6.1</version>
+      <version>5.6.2</version>
     </dependency>
     <dependency>
       <groupId>com.google.zxing</groupId>
@@ -539,35 +539,14 @@
               </wsdlDirectory>
               <wsdlFiles>
                 <wsdlFile>conn/EventService.wsdl</wsdlFile>
-                  <wsdlFile>conn/CardService_v8_1_2.wsdl</wsdlFile>
+                <wsdlFile>conn/CardService_v8_1_2.wsdl</wsdlFile>
               </wsdlFiles>
               <keep>true</keep>
               <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
             </configuration>
           </execution>
-              <execution>
-                  <id>card-service-v821</id>
-                  <goals>
-                      <goal>wsimport</goal>
-                  </goals>
-                  <configuration>
-                      <wsdlDirectory>
-                          src/main/resources/api-telematik-OPB4
-                      </wsdlDirectory>
-                      <wsdlFiles>
-                          <wsdlFile>conn/CardService_v8_2_1.wsdl</wsdlFile>
-                      </wsdlFiles>
-
-                      <bindingFiles>
-                          <bindingFile>cardservice_v8_2_1.xjb</bindingFile>
-                      </bindingFiles>
-                      <extension>true</extension>
-                      <keep>true</keep>
-                      <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
-                  </configuration>
-              </execution>
           <execution>
-            <id>signatureservice74</id>
+            <id>card-service-v821</id>
             <goals>
               <goal>wsimport</goal>
             </goals>
@@ -575,13 +554,51 @@
               <wsdlDirectory>
                 src/main/resources/api-telematik-OPB4
               </wsdlDirectory>
+              <wsdlFiles>
+                <wsdlFile>conn/CardService_v8_2_1.wsdl</wsdlFile>
+              </wsdlFiles>
+              <bindingFiles>
+                <bindingFile>cardservice_v8_2_1.xjb</bindingFile>
+              </bindingFiles>
+              <extension>true</extension>
+              <keep>true</keep>
+              <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
+            </configuration>
+          </execution>
+          <execution>
+            <id>signature-service</id>
+            <goals>
+              <goal>wsimport</goal>
+            </goals>
+            <configuration>
+              <wsdlDirectory>
+                src/main/resources/api-telematik-OPB4
+              </wsdlDirectory>
+              <wsdlFiles>
+                <wsdlFile>conn/SignatureService.wsdl</wsdlFile>
+              </wsdlFiles>
+              <keep>true</keep>
+              <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
+            </configuration>
+          </execution>
+          <execution>
+            <id>certificate-service</id>
+            <goals>
+              <goal>wsimport</goal>
+            </goals>
+            <configuration>
+              <wsdlDirectory>
+                src/main/resources/api-telematik-OPB4
+              </wsdlDirectory>
+              <wsdlFiles>
+                <wsdlFile>conn/CertificateService.wsdl</wsdlFile>
+              </wsdlFiles>
               <keep>true</keep>
               <sourceDestDir>${project.build.directory}/generated-sources</sourceDestDir>
             </configuration>
           </execution>
         </executions>
       </plugin>
-
     </plugins>
   </build>
 </project>

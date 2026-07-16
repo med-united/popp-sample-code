@@ -32,7 +32,9 @@ import de.gematik.zeta.sdk.attestation.model.PlatformProductId;
 import de.gematik.zeta.sdk.authentication.AuthConfig;
 import de.gematik.zeta.sdk.authentication.SubjectTokenProvider;
 import de.gematik.zeta.sdk.authentication.smb.SmbTokenProvider;
+import de.gematik.zeta.sdk.authentication.smcb.CustomSmcbTokenProvider;
 import de.gematik.zeta.sdk.network.http.client.ZetaHttpClientBuilder;
+import de.gematik.zeta.sdk.storage.InMemoryStorage;
 import de.gematik.zeta.sdk.storage.StorageConfig;
 import io.ktor.client.plugins.logging.LogLevel;
 import java.net.URI;
@@ -46,17 +48,49 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
+@Lazy
 @Configuration
 public class ZetaClientConfiguration {
   static final String APPLE_PLATFORM_TYPE_MACOS = "macos";
   static final String LINUX_PACKAGING_TYPE_JAR = "jar";
   static final String PLATFORM_PRODUCT_APPLICATION_ID = "testhub";
   static final String PLATFORM_PRODUCT_VERSION = "latest";
+  public static final String ZETA_SDK_CLIENT_P12 = "zetaSdkClientP12";
+  public static final String ZETA_SDK_CLIENT_CONNECTOR = "zetaSdkClientConnector";
 
-  @Bean
-  public ZetaSdkClient zetaSdkClient(
-      @Value("${popp-server.url}") final URI serverUri, ZetaConfigProperties zetaConfigProperties) {
+  private final CustomConnectorApiZeta customConnectorApiZeta;
+
+  ZetaClientConfiguration(CustomConnectorApiZeta customConnectorApiZeta) {
+    this.customConnectorApiZeta = customConnectorApiZeta;
+  }
+
+  @Bean(ZetaClientConfiguration.ZETA_SDK_CLIENT_P12)
+  public ZetaSdkClient zetaSdkClientP12(
+      @Value("${popp-server.url}") URI serverUri, ZetaConfigProperties zetaConfigProperties) {
+
+    return createZetaSdkClient(
+        serverUri,
+        zetaConfigProperties,
+        getTokenProviderForP12(
+            zetaConfigProperties.getAuthentication().getSmb().getKeyfile(),
+            zetaConfigProperties.getAuthentication().getSmb().getAlias(),
+            zetaConfigProperties.getAuthentication().getSmb().getPassword()));
+  }
+
+  @Bean(ZetaClientConfiguration.ZETA_SDK_CLIENT_CONNECTOR)
+  public ZetaSdkClient zetaSdkClientConnector(
+      @Value("${popp-server.url}") URI serverUri, ZetaConfigProperties zetaConfigProperties) {
+
+    return createZetaSdkClient(serverUri, zetaConfigProperties, getTokenProviderForConnector());
+  }
+
+  private ZetaSdkClient createZetaSdkClient(
+      URI serverUri,
+      ZetaConfigProperties zetaConfigProperties,
+      SubjectTokenProvider tokenProvider) {
+
     Log.INSTANCE.setLogLevel(mapToZetaLogLevel(zetaConfigProperties.getHttpLogLevel()));
 
     return ZetaSdk.INSTANCE.build(
@@ -65,18 +99,10 @@ public class ZetaClientConfiguration {
             "demo-client",
             "0.2.0",
             "sdk-client",
-            new StorageConfig.Default(zetaConfigProperties.getStorage().getAesB64Key(), null),
+            new StorageConfig.Custom(new InMemoryStorage()),
             new TpmConfig() {},
             new AuthConfig(
-                List.of("popp"),
-                30L,
-                true,
-                getTokenProvider(
-                    zetaConfigProperties.getAuthentication().getSmb().getKeyfile(),
-                    zetaConfigProperties.getAuthentication().getSmb().getAlias(),
-                    zetaConfigProperties.getAuthentication().getSmb().getPassword()),
-                AttestationConfig.software(),
-                ""),
+                List.of("popp"), 30L, true, tokenProvider, AttestationConfig.software(), ""),
             createPlatformProductId(),
             new ZetaHttpClientBuilder()
                 .disableServerValidation(
@@ -117,7 +143,7 @@ public class ZetaClientConfiguration {
         "Unsupported operating system for ZETA platform product id: " + osName);
   }
 
-  private SubjectTokenProvider getTokenProvider(
+  private SubjectTokenProvider getTokenProviderForP12(
       final String keyfile, final String alias, final String password) {
     final Path resolvedKeyfile = PathResolver.resolveAgainstWorkingDirectoryAncestors(keyfile);
     if (!Files.isReadable(resolvedKeyfile)) {
@@ -126,6 +152,10 @@ public class ZetaClientConfiguration {
 
     return new SmbTokenProvider(
         new SmbTokenProvider.Credentials(resolvedKeyfile.toString(), alias, password, ""));
+  }
+
+  private SubjectTokenProvider getTokenProviderForConnector() {
+    return new CustomSmcbTokenProvider(customConnectorApiZeta);
   }
 
   static ZetaLogLevel mapToZetaLogLevel(final LogLevel httpLogLevel) {

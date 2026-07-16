@@ -23,9 +23,10 @@ package de.gematik.refpopp.popp_client.services;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
+import de.gematik.poppcommons.api.enums.CardConnectionType;
 import de.gematik.poppcommons.api.messages.ScenarioResponseMessage;
-import de.gematik.refpopp.popp_client.client.ClientServerCommunicationService;
-import de.gematik.refpopp.popp_client.client.SecureWebSocketClient;
+import de.gematik.refpopp.popp_client.client.transport.ClientServerCommunicationService;
+import de.gematik.refpopp.popp_client.client.transport.SecureWebSocketClient;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,10 +65,10 @@ class ClientServerCommunicationServiceTest {
     when(webSocketClientMock.isOpen()).thenReturn(true);
 
     // when
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
 
     // then
-    verify(webSocketClientMock, never()).connectBlocking();
+    verify(webSocketClientMock, never()).connectBlocking(CardConnectionType.CONTACT_VIRTUAL);
   }
 
   @Test
@@ -76,10 +77,10 @@ class ClientServerCommunicationServiceTest {
     when(webSocketClientMock.isClosed()).thenReturn(true);
 
     // when
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
 
     // then
-    verify(webSocketClientMock).connectBlocking();
+    verify(webSocketClientMock).connectBlocking(CardConnectionType.CONTACT_VIRTUAL);
     verify(webSocketClientProviderMock).getObject();
   }
 
@@ -88,10 +89,13 @@ class ClientServerCommunicationServiceTest {
     // given
     when(webSocketClientMock.isClosed()).thenReturn(true);
     final var connectionException = new RuntimeException("Connection failed");
-    doThrow(connectionException).when(webSocketClientMock).connectBlocking();
+    doThrow(connectionException)
+        .when(webSocketClientMock)
+        .connectBlocking(CardConnectionType.CONTACT_VIRTUAL);
 
     // when / then
-    final var thrown = assertThrows(RuntimeException.class, () -> sut.connect());
+    final var thrown =
+        assertThrows(RuntimeException.class, () -> sut.connect(CardConnectionType.CONTACT_VIRTUAL));
     org.assertj.core.api.Assertions.assertThat(thrown).isSameAs(connectionException);
     verify(webSocketClientMock).close();
   }
@@ -100,7 +104,7 @@ class ClientServerCommunicationServiceTest {
   void disconnectClosesCurrentWebSocketClient() {
     // given
     when(webSocketClientMock.isOpen()).thenReturn(true);
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
 
     // when
     sut.disconnect();
@@ -114,7 +118,7 @@ class ClientServerCommunicationServiceTest {
     // given
     when(webSocketClientMock.isClosed()).thenReturn(false);
     when(objectMapperMock.writeValueAsString(any())).thenReturn("message");
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
     final var responseMessage = new ScenarioResponseMessage(List.of("9000", "abcdef"));
 
     // when
@@ -155,11 +159,11 @@ class ClientServerCommunicationServiceTest {
   @Test
   void getSSLSession() {
     // given
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
     when(webSocketClientMock.getSSLSession()).thenReturn(null);
 
     // when
-    sut.getSSLSession();
+    sut.getSslSession();
 
     // then
     verify(webSocketClientMock).getSSLSession();
@@ -172,10 +176,10 @@ class ClientServerCommunicationServiceTest {
     when(webSocketClientMock.isOpen()).thenReturn(true);
 
     // when
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
 
     // then
-    verify(webSocketClientMock, never()).connectBlocking();
+    verify(webSocketClientMock, never()).connectBlocking(CardConnectionType.CONTACT_VIRTUAL);
   }
 
   @Test
@@ -183,7 +187,7 @@ class ClientServerCommunicationServiceTest {
     // given
     when(webSocketClientMock.isClosed()).thenReturn(false);
     when(objectMapperMock.writeValueAsString(any())).thenReturn("message");
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
     when(webSocketClientMock.isClosed()).thenReturn(true);
     final var responseMessage = new ScenarioResponseMessage(List.of("9000", "abcdef"));
 
@@ -198,10 +202,10 @@ class ClientServerCommunicationServiceTest {
     when(webSocketClientMock.isOpen()).thenReturn(false);
 
     // when
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
 
     // then
-    verify(webSocketClientMock).connectBlocking();
+    verify(webSocketClientMock).connectBlocking(CardConnectionType.CONTACT_VIRTUAL);
   }
 
   @Test
@@ -209,7 +213,7 @@ class ClientServerCommunicationServiceTest {
     // given
     when(webSocketClientMock.isClosed()).thenReturn(true);
     when(objectMapperMock.writeValueAsString(any())).thenReturn("message");
-    sut.connect();
+    sut.connect(CardConnectionType.CONTACT_VIRTUAL);
     final var responseMessage = new ScenarioResponseMessage(List.of("9000", "abcdef"));
 
     // when & then

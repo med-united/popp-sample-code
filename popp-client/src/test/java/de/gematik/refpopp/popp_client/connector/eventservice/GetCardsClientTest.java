@@ -74,6 +74,7 @@ class GetCardsClientTest {
     final var cardInfoType = new CardInfoType();
     cardInfoType.setCardType(CardTypeType.EGK);
     cardInfoType.setCardHandle("cardHandle1");
+    cardInfoType.setKvnr("kvnr");
     when(serviceEndpointProviderMock.getEventServiceFullEndpoint()).thenReturn("service.endpoint");
     when(soapResponseMock.getCards().getCard()).thenReturn(List.of(cardInfoType));
     final GetCardsClient spySut = spy(sut);
@@ -82,7 +83,7 @@ class GetCardsClientTest {
         .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    final var actualResponse = spySut.performGetCards();
+    final var actualResponse = spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(actualResponse).isNotNull();
@@ -102,7 +103,7 @@ class GetCardsClientTest {
         .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    final var actualResponse = spySut.performGetCards();
+    final var actualResponse = spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(actualResponse).isNotNull();
@@ -115,8 +116,10 @@ class GetCardsClientTest {
     final var soapResponseMock = mock(GetCardsResponse.class, RETURNS_DEEP_STUBS);
     final var cardInfoType1 = new CardInfoType();
     cardInfoType1.setCardHandle("handle1");
+    cardInfoType1.setKvnr("kvnr");
     final var cardInfoType2 = new CardInfoType();
     cardInfoType2.setCardHandle("handle2");
+    cardInfoType2.setKvnr("kvnr");
     when(serviceEndpointProviderMock.getEventServiceFullEndpoint()).thenReturn("service.endpoint");
     when(soapResponseMock.getCards().getCard()).thenReturn(List.of(cardInfoType1, cardInfoType2));
     final GetCardsClient spySut = spy(sut);
@@ -125,10 +128,106 @@ class GetCardsClientTest {
         .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    final var actualResponse = spySut.performGetCards();
+    final var actualResponse = spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(actualResponse.getCardHandles()).containsExactly("handle1", "handle2");
+  }
+
+  @Test
+  void performGetCardsFiltersByKvnrWhenKvnrMatches() {
+    // given
+    final var soapResponseMock = mock(GetCardsResponse.class, RETURNS_DEEP_STUBS);
+    final var matchingCardInfoType = new CardInfoType();
+    matchingCardInfoType.setCardHandle("matchingHandle");
+    matchingCardInfoType.setKvnr("X110629641");
+    final var otherCardInfoType = new CardInfoType();
+    otherCardInfoType.setCardHandle("otherHandle");
+    otherCardInfoType.setKvnr("A123456789");
+    when(serviceEndpointProviderMock.getEventServiceFullEndpoint()).thenReturn("service.endpoint");
+    when(soapResponseMock.getCards().getCard())
+        .thenReturn(List.of(matchingCardInfoType, otherCardInfoType));
+    final GetCardsClient spySut = spy(sut);
+    doReturn(soapResponseMock)
+        .when(spySut)
+        .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
+
+    // when
+    final var actualResponse = spySut.performGetCards("X110629641", CardTypeType.EGK);
+
+    // then
+    assertThat(actualResponse.getCardHandles()).containsExactly("matchingHandle");
+  }
+
+  @Test
+  void performGetCardsFiltersByKvnrCaseInsensitively() {
+    // given
+    final var soapResponseMock = mock(GetCardsResponse.class, RETURNS_DEEP_STUBS);
+    final var cardInfoType = new CardInfoType();
+    cardInfoType.setCardHandle("matchingHandle");
+    cardInfoType.setKvnr("x110629641");
+    when(serviceEndpointProviderMock.getEventServiceFullEndpoint()).thenReturn("service.endpoint");
+    when(soapResponseMock.getCards().getCard()).thenReturn(List.of(cardInfoType));
+    final GetCardsClient spySut = spy(sut);
+    doReturn(soapResponseMock)
+        .when(spySut)
+        .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
+
+    // when
+    final var actualResponse = spySut.performGetCards("X110629641", CardTypeType.EGK);
+
+    // then
+    assertThat(actualResponse.getCardHandles()).containsExactly("matchingHandle");
+  }
+
+  @Test
+  void performGetCardsIgnoresCardsWithoutKvnrWhenFilteringByKvnr() {
+    // given
+    final var soapResponseMock = mock(GetCardsResponse.class, RETURNS_DEEP_STUBS);
+    final var cardWithoutKvnr = new CardInfoType();
+    cardWithoutKvnr.setCardHandle("nullKvnrHandle");
+    final var matchingCardInfoType = new CardInfoType();
+    matchingCardInfoType.setCardHandle("matchingHandle");
+    matchingCardInfoType.setKvnr("X110629641");
+    when(serviceEndpointProviderMock.getEventServiceFullEndpoint()).thenReturn("service.endpoint");
+    when(soapResponseMock.getCards().getCard())
+        .thenReturn(List.of(cardWithoutKvnr, matchingCardInfoType));
+    final GetCardsClient spySut = spy(sut);
+    doReturn(soapResponseMock)
+        .when(spySut)
+        .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
+
+    // when
+    final var actualResponse = spySut.performGetCards("X110629641", CardTypeType.EGK);
+
+    // then
+    assertThat(actualResponse.getCardHandles()).containsExactly("matchingHandle");
+  }
+
+  @Test
+  void performGetCardsReturnsAllHandlesWhenKvnrIsBlankOrNull() {
+    // given
+    final var soapResponseMock = mock(GetCardsResponse.class, RETURNS_DEEP_STUBS);
+    final var cardInfoType1 = new CardInfoType();
+    cardInfoType1.setCardHandle("handle1");
+    cardInfoType1.setKvnr("X110629641");
+    final var cardInfoType2 = new CardInfoType();
+    cardInfoType2.setCardHandle("handle2");
+    cardInfoType2.setKvnr("A123456789");
+    when(serviceEndpointProviderMock.getEventServiceFullEndpoint()).thenReturn("service.endpoint");
+    when(soapResponseMock.getCards().getCard()).thenReturn(List.of(cardInfoType1, cardInfoType2));
+    final GetCardsClient spySut = spy(sut);
+    doReturn(soapResponseMock)
+        .when(spySut)
+        .sendRequest(any(), anyString(), eq(GetCardsResponse.class));
+
+    // when
+    final var actualResponseWithNullKvnr = spySut.performGetCards(null, CardTypeType.EGK);
+    final var actualResponseWithBlankKvnr = spySut.performGetCards("   ", CardTypeType.EGK);
+
+    // then
+    assertThat(actualResponseWithNullKvnr.getCardHandles()).containsExactly("handle1", "handle2");
+    assertThat(actualResponseWithBlankKvnr.getCardHandles()).containsExactly("handle1", "handle2");
   }
 
   @Test
@@ -144,7 +243,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getCtId()).isEqualTo("ct-id");
@@ -166,7 +265,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getCtId()).isNull();
@@ -185,7 +284,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getSlotId()).isEqualTo(BigInteger.ONE);
@@ -207,7 +306,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getSlotId()).isNull();
@@ -234,7 +333,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getSlotId()).isNull();
@@ -256,7 +355,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getSlotId()).isNull();
@@ -283,7 +382,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getSlotId()).isNull();
@@ -302,7 +401,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(requestCaptor.getValue().getCardType()).isEqualTo(CardTypeType.EGK);
@@ -327,7 +426,7 @@ class GetCardsClientTest {
         .sendRequest(requestCaptor.capture(), anyString(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     final var actualContext = requestCaptor.getValue().getContext();
@@ -350,7 +449,7 @@ class GetCardsClientTest {
         .sendRequest(any(), endpointCaptor.capture(), eq(GetCardsResponse.class));
 
     // when
-    spySut.performGetCards();
+    spySut.performGetCards("kvnr", CardTypeType.EGK);
 
     // then
     assertThat(endpointCaptor.getValue()).isEqualTo("https://konnektor.example/event");
