@@ -20,6 +20,7 @@
 
 package de.gematik.refpopp.popp_client.connector;
 
+import de.gematik.refpopp.popp_client.connector.cardservice.GetPinStatusClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.SecureSendAPDUClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.StartCardSessionClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.StopCardSessionClient;
@@ -28,6 +29,7 @@ import de.gematik.refpopp.popp_client.connector.certificateservice.ReadCardCerti
 import de.gematik.refpopp.popp_client.connector.eventservice.DetermineCardHandleResponse;
 import de.gematik.refpopp.popp_client.connector.eventservice.GetCardsClient;
 import de.gematik.refpopp.popp_client.connector.signatureservice.ExternalAuthenticateClient;
+import de.gematik.ws.conn.cardservice.v821.PinStatusEnum;
 import de.gematik.ws.conn.cardservicecommon.v2.CardTypeType;
 import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
 import de.gematik.ws.conn.connectorcommon.v5.Status;
@@ -44,6 +46,7 @@ public class RealConnectorCommunicationService {
   private final StopCardSessionClient stopCardSessionClient;
   private final SecureSendAPDUClient secureSendAPDUClient;
   private final VerifyPinClient verifyPinClient;
+  private final GetPinStatusClient getPinStatusClient;
   private final ReadCardCertificateClient readCardCertificateClient;
   private final ExternalAuthenticateClient externalAuthenticateClient;
 
@@ -53,6 +56,7 @@ public class RealConnectorCommunicationService {
       final StopCardSessionClient stopCardSessionClient,
       final SecureSendAPDUClient secureSendAPDUClient,
       final VerifyPinClient verifyPinClient,
+      final GetPinStatusClient getPinStatusClient,
       final ReadCardCertificateClient readCardCertificateClient,
       final ExternalAuthenticateClient externalAuthenticateClient) {
     this.getCardsClient = getCardsClient;
@@ -60,6 +64,7 @@ public class RealConnectorCommunicationService {
     this.stopCardSessionClient = stopCardSessionClient;
     this.secureSendAPDUClient = secureSendAPDUClient;
     this.verifyPinClient = verifyPinClient;
+    this.getPinStatusClient = getPinStatusClient;
     this.readCardCertificateClient = readCardCertificateClient;
     this.externalAuthenticateClient = externalAuthenticateClient;
   }
@@ -94,6 +99,10 @@ public class RealConnectorCommunicationService {
 
   public PinResponseType verifyPin(final String cardHandle) {
     return verifyPinClient.performVerifyPin(cardHandle);
+  }
+
+  public PinStatusEnum getPinStatus(final String cardHandle) {
+    return getPinStatusClient.performGetPinStatus(cardHandle).getPinStatus();
   }
 
   public byte[] readCardCertificate(final String cardHandle) {

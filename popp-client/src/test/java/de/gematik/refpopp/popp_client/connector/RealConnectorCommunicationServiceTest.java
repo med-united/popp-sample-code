@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.gematik.refpopp.popp_client.connector.cardservice.GetPinStatusClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.SecureSendAPDUClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.StartCardSessionClient;
 import de.gematik.refpopp.popp_client.connector.cardservice.StopCardSessionClient;
@@ -49,6 +50,7 @@ class RealConnectorCommunicationServiceTest {
   private StopCardSessionClient stopCardSessionClientMock;
   private SecureSendAPDUClient secureSendAPDUClientMock;
   private VerifyPinClient verifyPinClientMock;
+  private GetPinStatusClient getPinStatusClientMock;
   private ReadCardCertificateClient readCardCertificateClientMock;
   private ExternalAuthenticateClient externalAuthenticateClientMock;
 
@@ -59,6 +61,7 @@ class RealConnectorCommunicationServiceTest {
     stopCardSessionClientMock = mock(StopCardSessionClient.class);
     secureSendAPDUClientMock = mock(SecureSendAPDUClient.class);
     verifyPinClientMock = mock(VerifyPinClient.class);
+    getPinStatusClientMock = mock(GetPinStatusClient.class);
     readCardCertificateClientMock = mock(ReadCardCertificateClient.class);
     externalAuthenticateClientMock = mock(ExternalAuthenticateClient.class);
     sut =
@@ -68,6 +71,7 @@ class RealConnectorCommunicationServiceTest {
             stopCardSessionClientMock,
             secureSendAPDUClientMock,
             verifyPinClientMock,
+            getPinStatusClientMock,
             readCardCertificateClientMock,
             externalAuthenticateClientMock);
   }

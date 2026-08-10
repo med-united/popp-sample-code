@@ -25,10 +25,13 @@ import lombok.Getter;
 @Getter
 public enum SoapActions {
   GET_CARDS("http://ws.gematik.de/conn/EventService/v", "#GetCards"),
+  SUBSCRIBE("http://ws.gematik.de/conn/EventService/v", "#Subscribe"),
+  UNSUBSCRIBE("http://ws.gematik.de/conn/EventService/v", "#Unsubscribe"),
   START_CARD_SESSION("http://ws.gematik.de/conn/CardService/v", "#StartCardSession"),
   SECURE_SEND_APDU("http://ws.gematik.de/conn/CardService/v", "#SecureSendAPDU"),
   STOP_CARD_SESSION("http://ws.gematik.de/conn/CardService/v", "#StopCardSession"),
   VERIFY_PIN("http://ws.gematik.de/conn/CardService/v", "#VerifyPin"),
+  GET_PIN_STATUS("http://ws.gematik.de/conn/CardService/v", "#GetPinStatus"),
   READ_CARD_CERTIFICATE("http://ws.gematik.de/conn/CertificateService/v", "#ReadCardCertificate"),
   EXTERNAL_AUTHENTICATE("http://ws.gematik.de/conn/SignatureService/v", "#ExternalAuthenticate");
 

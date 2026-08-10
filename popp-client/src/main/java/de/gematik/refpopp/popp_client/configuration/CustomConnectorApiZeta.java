@@ -21,6 +21,7 @@
 package de.gematik.refpopp.popp_client.configuration;
 
 import de.gematik.refpopp.popp_client.connector.RealConnectorCommunicationService;
+import de.gematik.ws.conn.cardservice.v821.PinStatusEnum;
 import de.gematik.zeta.sdk.authentication.smcb.CustomConnectorApi;
 import kotlin.coroutines.Continuation;
 import lombok.AllArgsConstructor;
@@ -46,7 +47,11 @@ public class CustomConnectorApiZeta implements CustomConnectorApi {
   public byte @Nullable [] externalAuthenticate(
       @NonNull String base64Challenge, @NonNull Continuation<? super byte[]> continuation) {
     String cardHandle = realConnectorCommunicationService.getConnectedSmcbCard();
-    realConnectorCommunicationService.verifyPin(cardHandle);
+    final PinStatusEnum pinStatus = realConnectorCommunicationService.getPinStatus(cardHandle);
+    if (pinStatus != PinStatusEnum.VERIFIED) {
+      log.info("| PIN.SMC status is {}, requesting PIN verification", pinStatus);
+      realConnectorCommunicationService.verifyPin(cardHandle);
+    }
     return realConnectorCommunicationService.externalAuthenticate(base64Challenge, cardHandle);
   }
 }

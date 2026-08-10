@@ -99,7 +99,7 @@ public class ZetaClientConfiguration {
             "demo-client",
             "0.2.0",
             "sdk-client",
-            new StorageConfig.Custom(new InMemoryStorage()),
+            createStorageConfig(zetaConfigProperties),
             new TpmConfig() {},
             new AuthConfig(
                 List.of("popp"), 30L, true, tokenProvider, AttestationConfig.software(), ""),
@@ -111,6 +111,15 @@ public class ZetaClientConfiguration {
             null,
             null,
             createZetaLogger()));
+  }
+
+  private static StorageConfig createStorageConfig(ZetaConfigProperties zetaConfigProperties) {
+    final var storage = zetaConfigProperties.getStorage();
+    final String aesB64Key = storage != null ? storage.getAesB64Key() : null;
+    if (aesB64Key != null && !aesB64Key.isBlank()) {
+      return new StorageConfig.Default(aesB64Key, null, "");
+    }
+    return new StorageConfig.Custom(new InMemoryStorage());
   }
 
   static PlatformProductId createPlatformProductId() {

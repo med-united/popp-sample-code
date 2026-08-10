@@ -32,8 +32,14 @@ public class SoapActionVersionHelper {
   public static String buildSoapAction(
       ServiceEndpointProvider endpointProvider, SoapActions soapAction) {
     String version;
-    if (soapAction == SoapActions.GET_CARDS) {
+    if (soapAction == SoapActions.GET_CARDS
+        || soapAction == SoapActions.SUBSCRIBE
+        || soapAction == SoapActions.UNSUBSCRIBE) {
       version = getVersionFromServiceEndpoint(endpointProvider.getEventServiceEndpoint());
+    } else if (soapAction == SoapActions.READ_CARD_CERTIFICATE) {
+      version = getVersionFromServiceEndpoint(endpointProvider.getCertificateServiceEndpoint());
+    } else if (soapAction == SoapActions.EXTERNAL_AUTHENTICATE) {
+      version = getVersionFromServiceEndpoint(endpointProvider.getAuthSignatureServiceEndpoint());
     } else {
       version = getVersionFromServiceEndpoint(endpointProvider.getCardServiceEndpoint());
     }

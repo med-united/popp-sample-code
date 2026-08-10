@@ -55,6 +55,16 @@ public class ServiceEndpointProvider {
         + determineServiceEndpoint(cardServicePath).getEndpoint();
   }
 
+  public ServiceEndpoint getCertificateServiceEndpoint() {
+    final var certificateServicePath = servicePathExtractor.getCertificateServicePath();
+    return determineServiceEndpoint(certificateServicePath);
+  }
+
+  public ServiceEndpoint getAuthSignatureServiceEndpoint() {
+    final var authSignatureServicePath = servicePathExtractor.getAuthSignatureServicePath();
+    return determineServiceEndpoint(authSignatureServicePath);
+  }
+
   public String getCertificateServiceFullEndpoint() {
     final var certificateServicePath = servicePathExtractor.getCertificateServicePath();
     return servicePathExtractor.getConnectorUrl()
