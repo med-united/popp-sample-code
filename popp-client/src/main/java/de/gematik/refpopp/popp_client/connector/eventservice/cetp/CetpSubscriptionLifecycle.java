@@ -23,6 +23,9 @@ package de.gematik.refpopp.popp_client.connector.eventservice.cetp;
 import de.gematik.refpopp.popp_client.connector.eventservice.SubscribeClient;
 import de.gematik.refpopp.popp_client.connector.eventservice.UnsubscribeClient;
 import jakarta.annotation.PreDestroy;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,17 +38,16 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Starts the CETP listener and keeps a CARD/INSERTED subscription alive at the connector.
- * Subscriptions expire (max 24h), so the client re-subscribes periodically; re-subscribing also
- * recovers a subscription lost to a connector restart.
+ * Starts the CETP listener and keeps one subscription per topic (CARD/INSERTED, CARD/REMOVED) alive
+ * at the connector. Subscriptions expire (max 24h), so the client re-subscribes periodically;
+ * re-subscribing also recovers a subscription lost to a connector restart.
  */
 @Component
 @ConditionalOnProperty(prefix = "connector.cetp", name = "enabled", havingValue = "true")
 @Slf4j
 public class CetpSubscriptionLifecycle {
 
-  // Topic matching is prefix-based: subscribing to CARD delivers CARD/INSERTED, CARD/REMOVED, ...
-  private static final String TOPIC_CARD = "CARD";
+  private static final List<String> TOPICS = List.of("CARD/INSERTED", "CARD/REMOVED");
 
   private final CetpEventListener cetpEventListener;
   private final SubscribeClient subscribeClient;
@@ -61,7 +63,7 @@ public class CetpSubscriptionLifecycle {
             thread.setDaemon(true);
             return thread;
           });
-  private volatile String subscriptionId;
+  private final Map<String, String> subscriptionIds = new ConcurrentHashMap<>();
 
   public CetpSubscriptionLifecycle(
       final CetpEventListener cetpEventListener,
@@ -89,18 +91,20 @@ public class CetpSubscriptionLifecycle {
   }
 
   private void subscribe() {
-    try {
-      final var eventTo = "cetp://" + eventToUrl + ":" + eventToPort;
-      final var response = subscribeClient.performSubscribe(eventTo, TOPIC_CARD);
-      subscriptionId = response.getSubscriptionID();
-      log.info(
-          "| Subscribed to {} events at {} (subscription {}, valid until {})",
-          TOPIC_CARD,
-          eventTo,
-          subscriptionId,
-          response.getTerminationTime());
-    } catch (Exception e) {
-      log.error("| Could not subscribe to connector events: {}", e.getMessage());
+    final var eventTo = "cetp://" + eventToUrl + ":" + eventToPort;
+    for (final var topic : TOPICS) {
+      try {
+        final var response = subscribeClient.performSubscribe(eventTo, topic);
+        subscriptionIds.put(topic, response.getSubscriptionID());
+        log.info(
+            "| Subscribed to {} events at {} (subscription {}, valid until {})",
+            topic,
+            eventTo,
+            response.getSubscriptionID(),
+            response.getTerminationTime());
+      } catch (Exception e) {
+        log.error("| Could not subscribe to {} events: {}", topic, e.getMessage());
+      }
     }
   }
 
@@ -112,14 +116,15 @@ public class CetpSubscriptionLifecycle {
   }
 
   private void unsubscribe() {
-    if (subscriptionId == null) {
-      return;
-    }
-    try {
-      unsubscribeClient.performUnsubscribe(subscriptionId);
-      log.info("| Unsubscribed from connector events (subscription {})", subscriptionId);
-    } catch (Exception e) {
-      log.warn("| Could not unsubscribe from connector events: {}", e.getMessage());
-    }
+    subscriptionIds.forEach(
+        (topic, subscriptionId) -> {
+          try {
+            unsubscribeClient.performUnsubscribe(subscriptionId);
+            log.info("| Unsubscribed from {} events (subscription {})", topic, subscriptionId);
+          } catch (Exception e) {
+            log.warn("| Could not unsubscribe from {} events: {}", topic, e.getMessage());
+          }
+        });
+    subscriptionIds.clear();
   }
 }
