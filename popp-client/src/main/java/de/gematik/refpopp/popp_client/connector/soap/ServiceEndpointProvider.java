@@ -77,6 +77,24 @@ public class ServiceEndpointProvider {
         + determineServiceEndpoint(authSignatureServicePath).getEndpoint();
   }
 
+  public ServiceEndpoint getCertificateServiceEndpoint() {
+    return determineServiceEndpoint(servicePathExtractor.getCertificateServicePath());
+  }
+
+  public String getCertificateServiceFullEndpoint() {
+    final var path = servicePathExtractor.getCertificateServicePath();
+    return servicePathExtractor.getConnectorUrl() + determineServiceEndpoint(path).getEndpoint();
+  }
+
+  public ServiceEndpoint getAuthSignatureServiceEndpoint() {
+    return determineServiceEndpoint(servicePathExtractor.getAuthSignatureServicePath());
+  }
+
+  public String getAuthSignatureServiceFullEndpoint() {
+    final var path = servicePathExtractor.getAuthSignatureServicePath();
+    return servicePathExtractor.getConnectorUrl() + determineServiceEndpoint(path).getEndpoint();
+  }
+
   private ServiceEndpoint determineServiceEndpoint(final ServicePath servicePath) {
     final var serviceEndpoint = new ServiceEndpoint();
     serviceEndpoint.setVersion(servicePath.getVersion());

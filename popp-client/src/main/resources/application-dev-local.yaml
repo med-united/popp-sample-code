@@ -38,6 +38,7 @@ virtual-card:
   image-file: "IMG_eGK_G21_TU_root6 1.xml"
 
 popp-client:
+  token-wait-timeout-seconds: ${TOKEN_WAIT_SECONDS:5}
   static-qr:
     tid: "1-20-ARV1661246300001992"
     wpid: ""

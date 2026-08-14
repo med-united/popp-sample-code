@@ -36,6 +36,9 @@
     <module>popp-server</module>
     <module>popp-client</module>
     <module>popp-coverage-report</module>
+    <module>api-telematik</module>
+    <module>vsdm-client</module>
+    <module>vsdm2-client</module>
   </modules>
 
   <properties>

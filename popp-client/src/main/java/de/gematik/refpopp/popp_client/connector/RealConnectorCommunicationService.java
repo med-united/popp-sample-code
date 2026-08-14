@@ -82,7 +82,7 @@ public class RealConnectorCommunicationService {
         getCardsClient.performGetCards("", CardTypeType.SMC_B);
     final var cardHandles = determineCardHandleResponse.getCardHandles();
 
-    return evaluateCardResponse(cardHandles);
+    return evaluateCardResponse(cardHandles, egkCardHandle);
   }
 
   public String startCardSession(final String cardHandle) {
@@ -116,6 +116,17 @@ public class RealConnectorCommunicationService {
   private String evaluateCardResponse(final List<String> res) {
     if (res.isEmpty()) {
       throw new IllegalStateException("| Error fetching GetCards response");
+    }
+    if (egkCardHandle != null && !egkCardHandle.isBlank()) {
+      if (res.contains(egkCardHandle)) {
+        log.info("| Using requested eGK card-handle '{}'", egkCardHandle);
+        return egkCardHandle;
+      }
+      throw new IllegalStateException(
+          "Requested eGK card-handle '"
+              + egkCardHandle
+              + "' not found in Konnektor's connected cards: "
+              + res);
     }
     return res.getFirst();
   }

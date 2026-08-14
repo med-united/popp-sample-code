@@ -46,8 +46,7 @@ public class SoapActionVersionHelper {
     return soapAction.getServiceEndpoint() + version + soapAction.getCommand();
   }
 
-  private static String getVersionFromServiceEndpoint(ServiceEndpoint endpoint) {
-
+  private static String getVersion(ServiceEndpoint endpoint) {
     String version = endpoint.getVersion();
     if (version == null || version.isBlank()) {
       throw new IllegalStateException("Version is missing for " + endpoint.getEndpoint());
