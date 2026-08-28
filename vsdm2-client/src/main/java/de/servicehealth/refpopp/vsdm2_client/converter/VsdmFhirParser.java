@@ -107,6 +107,16 @@ public class VsdmFhirParser {
         }
       }
     }
+    // Some Fachdienste (e.g. TK DEV) send the payor references without the
+    // VSDMKostentraegerRolle extension; the Hauptkostenträger is the first payor entry then.
+    for (Reference ref : coverage.getPayor()) {
+      if (ref.hasReference()) {
+        Organization organization = orgMap.get(ref.getReferenceElement().getIdPart());
+        if (organization != null) {
+          return Optional.of(organization);
+        }
+      }
+    }
     return Optional.empty();
   }
 }

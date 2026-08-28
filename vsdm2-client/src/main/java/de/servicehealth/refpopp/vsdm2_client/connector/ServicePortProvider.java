@@ -24,9 +24,13 @@ import de.gematik.ws.conn.authsignatureservice.wsdl.v7_4.AuthSignatureService;
 import de.gematik.ws.conn.authsignatureservice.wsdl.v7_4.AuthSignatureServicePortType;
 import de.gematik.ws.conn.certificateservice.wsdl.v6_0.CertificateService;
 import de.gematik.ws.conn.certificateservice.wsdl.v6_0.CertificateServicePortType;
+import de.gematik.ws.conn.eventservice.wsdl.v7_2.EventService;
+import de.gematik.ws.conn.eventservice.wsdl.v7_2.EventServicePortType;
 import de.gematik.ws.conn.servicedirectory.v3.ConnectorServices;
 import de.gematik.ws.conn.serviceinformation.v2.ServiceType;
 import de.gematik.ws.conn.serviceinformation.v2.VersionType;
+import de.gematik.ws.conn.vsds.vsdservice.v5_2.VSDService;
+import de.gematik.ws.conn.vsds.vsdservice.v5_2.VSDServicePortType;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.ws.BindingProvider;
@@ -43,18 +47,13 @@ import org.apache.cxf.configuration.jsse.TLSClientParameters;
 import org.apache.cxf.frontend.ClientProxy;
 import org.apache.cxf.transport.http.HTTPConduit;
 
-/**
- * Downloads and parses the connector service directory ({@code connector.sds}), then builds the
- * TLS-configured JAX-WS ports for the Konnektor services. Constructed once by {@link
- * ConnectorClient}; resolves each service's endpoint from the SDS and wires the CXF client with the
- * Konnektor TLS context.
- */
 @Slf4j
 public class ServicePortProvider {
 
   private static final String CERTIFICATE_SERVICE = "CertificateService";
   private static final String AUTH_SIGNATURE_SERVICE = "AuthSignatureService";
-  private static final String VSD_SERVICE_BINDING = "VSDServiceBinding";
+  private static final String EVENT_SERVICE = "EventService";
+  private static final String VSD_SERVICE = "VSDService";
 
   private final String connectorUrl;
   private final SSLContext sslContext;
@@ -64,32 +63,6 @@ public class ServicePortProvider {
     this.connectorUrl = connectorUrl;
     this.sslContext = sslContext;
     this.connectorServices = parse(downloadConnectorSds(connectorUrl, sslContext));
-  }
-
-  private static String downloadConnectorSds(
-      final String connectorUrl, final SSLContext sslContext) {
-    final URI sdsUrl = URI.create(connectorUrl + "/connector.sds");
-    log.info("Downloading connector.sds from '{}'", sdsUrl);
-
-    final HttpClient httpClient = HttpClient.newBuilder().sslContext(sslContext).build();
-    final HttpResponse<String> response;
-    try {
-      response =
-          httpClient.send(
-              HttpRequest.newBuilder(sdsUrl).GET().build(), HttpResponse.BodyHandlers.ofString());
-    } catch (final IOException | InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Failed to load connector.sds from " + sdsUrl, e);
-    }
-    if (response.statusCode() != 200 || response.body() == null) {
-      throw new IllegalStateException(
-          "Failed to load connector.sds from "
-              + sdsUrl
-              + " (status "
-              + response.statusCode()
-              + ")");
-    }
-    return response.body();
   }
 
   private static ConnectorServices parse(final String connectorSds) {
@@ -103,6 +76,33 @@ public class ServicePortProvider {
     }
   }
 
+  private static String downloadConnectorSds(
+      final String connectorUrl, final SSLContext sslContext) {
+    final URI connectorSdsUrl = URI.create(connectorUrl + "/connector.sds");
+    log.info("Downloading connector.sds from '{}'", connectorSdsUrl);
+
+    final HttpClient httpClient = HttpClient.newBuilder().sslContext(sslContext).build();
+    final HttpResponse<String> response;
+    try {
+      response =
+          httpClient.send(
+              HttpRequest.newBuilder(connectorSdsUrl).GET().build(),
+              HttpResponse.BodyHandlers.ofString());
+    } catch (final IOException | InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Failed to load connector.sds from " + connectorSdsUrl, e);
+    }
+    if (response.statusCode() != 200 || response.body() == null) {
+      throw new IllegalStateException(
+          "Failed to load connector.sds from "
+              + connectorSdsUrl
+              + " (status "
+              + response.statusCode()
+              + ")");
+    }
+    return response.body();
+  }
+
   public CertificateServicePortType certificateServicePort() {
     return configure(new CertificateService().getCertificateServicePort(), CERTIFICATE_SERVICE);
   }
@@ -112,7 +112,14 @@ public class ServicePortProvider {
         new AuthSignatureService().getAuthSignatureServicePort(), AUTH_SIGNATURE_SERVICE);
   }
 
-  /** Point a JAX-WS port at its resolved endpoint and apply the Konnektor TLS config. */
+  public EventServicePortType eventServicePort() {
+    return configure(new EventService().getEventServicePort(), EVENT_SERVICE);
+  }
+
+  public VSDServicePortType vsdServicePort() {
+    return configure(new VSDService().getVSDServicePort(), VSD_SERVICE);
+  }
+
   private <P> P configure(final P port, final String serviceName) {
     ((BindingProvider) port)
         .getRequestContext()
@@ -125,7 +132,6 @@ public class ServicePortProvider {
     return port;
   }
 
-  /** Resolve the full endpoint URL for {@code serviceName} from the connector.sds. */
   private String extractServiceEndpoint(final String serviceName) {
     final VersionType version = latestVersion(serviceName);
     final var tlsEndpoint = version.getEndpointTLS();

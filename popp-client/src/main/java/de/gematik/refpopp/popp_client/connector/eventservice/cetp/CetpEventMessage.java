@@ -20,11 +20,5 @@
 
 package de.gematik.refpopp.popp_client.connector.eventservice.cetp;
 
-/** Published when the PoPP token retrieval for an inserted eGK failed. */
-public record TokenRetrievalFailedMessage(
-    String type, String ctId, String slotId, String cardHandle, String error) {
-
-  public TokenRetrievalFailedMessage(final ConnectorCardInsertedEvent event, final String error) {
-    this("TokenRetrievalFailed", event.ctId(), event.slotId(), event.cardHandle(), error);
-  }
-}
+/** Published for every CETP card event (CARD/INSERTED or CARD/REMOVED) with the raw event XML. */
+public record CetpEventMessage(String cardTerminalId, String telematikId, String cetpXml) {}

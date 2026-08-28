@@ -29,4 +29,5 @@ public record ConnectorCardInsertedEvent(
     String ctId,
     String slotId,
     String insertTime,
-    String kvnr) {}
+    String kvnr,
+    String cetpXml) {}

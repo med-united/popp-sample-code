@@ -20,11 +20,5 @@
 
 package de.gematik.refpopp.popp_client.connector.eventservice.cetp;
 
-/** Message published to subscribed clients after a PoPP token was retrieved for an inserted eGK. */
-public record PoppTokenMessage(
-    String type, String ctId, String slotId, String cardHandle, String kvnr, String token) {
-
-  public PoppTokenMessage(final ConnectorCardInsertedEvent event, final String token) {
-    this("Token", event.ctId(), event.slotId(), event.cardHandle(), event.kvnr(), token);
-  }
-}
+/** Published after a PoPP token was retrieved for an inserted eGK. */
+public record PoppTokenMessage(String cardTerminalId, String telematikId, String poppToken) {}

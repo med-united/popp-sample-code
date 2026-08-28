@@ -42,6 +42,8 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
@@ -49,6 +51,7 @@ import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
 import org.apache.hc.client5.http.ssl.DefaultHostnameVerifier;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
+import org.apache.hc.core5.util.Timeout;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
@@ -142,10 +145,15 @@ public class BouncyCastleConfiguration {
     PoolingHttpClientConnectionManager connectionManager =
         PoolingHttpClientConnectionManagerBuilder.create()
             .setTlsSocketStrategy(tlsSocketStrategy)
+            .setDefaultConnectionConfig(
+                ConnectionConfig.custom().setConnectTimeout(Timeout.ofSeconds(10)).build())
             .build();
 
     return HttpClients.custom()
         .setConnectionManager(connectionManager)
+        // Without timeouts a hanging connector call blocks its caller forever.
+        .setDefaultRequestConfig(
+            RequestConfig.custom().setResponseTimeout(Timeout.ofSeconds(30)).build())
         // In order to prevent an I/O error: Content-Length header already present
         .addRequestInterceptorFirst(
             (httpRequest, entity, context) -> httpRequest.removeHeaders("Content-Length"))

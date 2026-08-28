@@ -46,6 +46,9 @@ zeta:
     password: ${ZETA_AUTHENTICATION_SMB_PASSWORD:00}
   http-log-level: ALL
 
+vsdm2-client:
+  url: ${VSDM2_CLIENT_URL:} # base URL of the vsdm2-client; empty disables the VSDM 2.0 fetch
+
 card-reader:
   name:
 

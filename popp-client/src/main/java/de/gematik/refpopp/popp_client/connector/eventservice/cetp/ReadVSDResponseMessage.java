@@ -18,19 +18,8 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
-package de.gematik.refpopp.popp_client.connector.authsignatureservice;
+package de.gematik.refpopp.popp_client.connector.eventservice.cetp;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.oxm.jaxb.Jaxb2Marshaller;
-
-@Configuration
-public class AuthSignatureServiceConfiguration {
-
-  @Bean
-  public Jaxb2Marshaller authSignatureServiceMarshaller() {
-    final Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-    marshaller.setContextPath("de.gematik.ws.conn.signatureservice.v7");
-    return marshaller;
-  }
-}
+/** Published after the VSDM 2.0 data was fetched with the PoPP token. */
+public record ReadVSDResponseMessage(
+    String cardTerminalId, String telematikId, String readVSDResponseXml) {}

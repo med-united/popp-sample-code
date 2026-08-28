@@ -1,27 +1,26 @@
 server:
   port: 8083
 
-# VSDM 2.0 Fachdienst (behind ZETA Guard). Default = TK DEV.
-# DEV catalog: https://service-discovery.dev.ti-platform.de/catalog.json. TK DEV reports
-# zeta_asl_use=required, so the ASL handshake is on.
-vsdm-server:
-  url: ${VSDM_SERVER_URL:https://vsdm-dev.tk.de}
+service-discovery:
+  url: ${SERVICE_DISCOVERY_URL:https://service-discovery.dev.ti-platform.de/catalog.json}
+  refresh-minutes: ${SERVICE_DISCOVERY_REFRESH_MINUTES:60}
 
 zeta:
-  # ZETA Guard uses its own scope vocabulary (zero:read / zero:write / zero:audience /
-  # zero:register / zero:manage). `zero:audience` tells the Guard to emit the audience claim on
-  # the access token (without it the resource server rejects with "Expected audience not
-  # available in the token").
-  scope: ${ZETA_SCOPE:zero:audience}
+  # The SDK validates the requested scope against the guard's scopes_supported. The TK DEV
+  # guard advertises `vsdservice` (and no longer `zero:audience`).
+  scope: ${ZETA_SCOPE:vsdservice}
   # ASL Production environment toggle. For DEV/RU/TU set to false; only prod targets use true.
   asl-prod: ${ZETA_ASL_PROD:false}
   client:
     disableServerValidation: ${ZETA_CLIENT_DISABLE_SERVER_VALIDATION:true}
   required-role-oid: ${ZETA_REQUIRED_ROLE_OID:}
+  storage:
+    aes-b64-key: ${ZETA_STORAGE_AES_B64_KEY:M6lnQhKYmMbzB08pBycjltAv+n9OkMGidTgUL//c8zk=}
 
 # Konnektor — mirrors popp-client's config keys.
 connector:
   end-point-url: ${CONNECTOR_END_POINT_URL:https://127.0.0.1}
+  smcb-iccsn: ${CONTEXT_SMCB_ICCSN:} # ICCSN of the SMC-B to use; empty = first SMC-B found
   secure:
     enable: ${CONNECTOR_SECURE_ENABLE:true}
     hostname-validation: ${CONNECTOR_SECURE_HOSTNAME_VALIDATION:false}
@@ -30,10 +29,8 @@ connector:
     trust-all: ${CONNECTOR_SECURE_TRUST_ALL:true}
     truststore: ${CONNECTOR_SECURE_TRUSTSTORE:truststore.p12}
     truststore-password: ${CONNECTOR_SECURE_TRUSTSTORE_PASSWORD:changeit}
-  terminal-configuration:
-    context:
+  context:
       client-system-id: ${CONTEXT_CLIENT_SYSTEM_ID:C1}
       workplace-id: ${CONTEXT_WORKPLACE_ID:W1}
       mandant-id: ${CONTEXT_MANDANT_ID:M1}
       user-id: ${CONTEXT_USER_ID:}
-    smcb-card-handle: ${CONTEXT_SMCB_CARD_HANDLE:}

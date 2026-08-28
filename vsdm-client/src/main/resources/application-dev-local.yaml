@@ -1,6 +1,0 @@
-popp-client:
-  api-url: ${POPP_CLIENT_API:http://localhost:8081/token}
-  communication-type: ${COMMUNICATION_TYPE:contact-connector}
-
-vsdm-server:
-  api-url: ${VSMD_SERVER_API:}

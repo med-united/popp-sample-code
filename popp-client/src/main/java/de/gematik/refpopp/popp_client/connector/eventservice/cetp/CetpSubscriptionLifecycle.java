@@ -33,7 +33,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -67,8 +66,10 @@ public class CetpSubscriptionLifecycle {
 
   public CetpSubscriptionLifecycle(
       final CetpEventListener cetpEventListener,
-      @Lazy final SubscribeClient subscribeClient,
-      @Lazy final UnsubscribeClient unsubscribeClient,
+      // Not @Lazy: the unsubscribe client must already exist as a bean when @PreDestroy runs,
+      // lazy creation is forbidden during context shutdown.
+      final SubscribeClient subscribeClient,
+      final UnsubscribeClient unsubscribeClient,
       @Value("${connector.cetp.event-to-url}") final String eventToUrl,
       @Value("${connector.cetp.event-to-port}") final int eventToPort,
       @Value("${connector.cetp.resubscribe-interval-hours}") final long resubscribeIntervalHours) {

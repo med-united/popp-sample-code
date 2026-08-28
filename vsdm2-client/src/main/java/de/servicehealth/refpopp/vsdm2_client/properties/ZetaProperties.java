@@ -30,9 +30,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * the access token. {@code aslProd} toggles the ASL production environment (false for DEV/RU/TU).
  */
 @ConfigurationProperties(prefix = "zeta")
-public record ZetaProperties(String scope, boolean aslProd, Client client, String requiredRoleOid) {
+public record ZetaProperties(
+    String scope, boolean aslProd, Client client, String requiredRoleOid, Storage storage) {
 
   public record Client(boolean disableServerValidation) {}
+
+  public record Storage(String aesB64Key) {}
 
   public String requiredRoleOidOrEmpty() {
     return requiredRoleOid == null ? "" : requiredRoleOid;

@@ -22,24 +22,6 @@ package de.servicehealth.refpopp.vsdm2_client.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** Konnektor endpoint, TLS material and terminal context. Mirrors popp-client's config keys. */
-@ConfigurationProperties(prefix = "connector")
-public record ConnectorProperties(
-    String endPointUrl, Secure secure, TerminalConfiguration terminalConfiguration) {
-
-  /** TLS settings for the mutually-authenticated Konnektor connection. */
-  public record Secure(
-      boolean enable,
-      boolean hostnameValidation,
-      String keystore,
-      String keystorePassword,
-      boolean trustAll,
-      String truststore,
-      String truststorePassword) {}
-
-  public record TerminalConfiguration(Context context, String smcbCardHandle) {
-
-    public record Context(
-        String clientSystemId, String mandantId, String workplaceId, String userId) {}
-  }
-}
+/** TI service discovery catalog used to route VSDM requests to the insurer's backend. */
+@ConfigurationProperties(prefix = "service-discovery")
+public record ServiceDiscoveryProperties(String url, long refreshMinutes) {}

@@ -35,8 +35,9 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Reacts to CARD/INSERTED events from the connector by running the existing PoPP token retrieval
- * flow for the inserted eGK and publishing the token to the card terminal's STOMP topic.
+ * Reacts to CETP card events: publishes the raw event XML to the card terminal's STOMP topic, runs
+ * the PoPP token retrieval for an inserted eGK, publishes the token and finally the VSDM 2.0 data
+ * fetched with it.
  */
 @Component
 @ConditionalOnProperty(prefix = "connector.cetp", name = "enabled", havingValue = "true")
@@ -47,6 +48,8 @@ public class CardInsertedTokenHandler {
 
   private final CommunicationService communicationService;
   private final SimpMessagingTemplate messagingTemplate;
+  private final TelematikIdProvider telematikIdProvider;
+  private final Vsdm2ReadClient vsdm2ReadClient;
   private final ExecutorService executor =
       Executors.newSingleThreadExecutor(
           runnable -> {
@@ -70,9 +73,13 @@ public class CardInsertedTokenHandler {
 
   public CardInsertedTokenHandler(
       @Lazy final CommunicationService communicationService,
-      final SimpMessagingTemplate messagingTemplate) {
+      final SimpMessagingTemplate messagingTemplate,
+      final TelematikIdProvider telematikIdProvider,
+      final Vsdm2ReadClient vsdm2ReadClient) {
     this.communicationService = communicationService;
     this.messagingTemplate = messagingTemplate;
+    this.telematikIdProvider = telematikIdProvider;
+    this.vsdm2ReadClient = vsdm2ReadClient;
   }
 
   @EventListener
@@ -85,13 +92,13 @@ public class CardInsertedTokenHandler {
     }
     final var retrieval = new Retrieval(event.cardHandle());
     currentRetrieval = retrieval;
-    publish(event.ctId(), new CardInsertedMessage(event));
+    publish(event.ctId(), new CetpEventMessage(event.ctId(), telematikId(), event.cetpXml()));
     retrieval.future = executor.submit(() -> retrieveToken(event, retrieval));
   }
 
   @EventListener
   public void onCardRemoved(final ConnectorCardRemovedEvent event) {
-    publish(event.ctId(), new CardRemovedMessage(event));
+    publish(event.ctId(), new CetpEventMessage(event.ctId(), telematikId(), event.cetpXml()));
     final var retrieval = currentRetrieval;
     if (retrieval == null
         || retrieval.cancelled
@@ -128,8 +135,9 @@ public class CardInsertedTokenHandler {
         log.info("| Card {} was removed, discarding retrieved PoPP token", event.cardHandle());
         return;
       }
-      publish(event.ctId(), new PoppTokenMessage(event, token));
+      publish(event.ctId(), new PoppTokenMessage(event.ctId(), telematikId(), token));
       log.info("| PoPP token for inserted eGK {} published", event.cardHandle());
+      fetchAndPublishVsd(event, retrieval, token);
     } catch (Exception e) {
       if (retrieval.cancelled) {
         log.info("| Token retrieval for eGK {} aborted after card removal", event.cardHandle());
@@ -139,11 +147,36 @@ public class CardInsertedTokenHandler {
           "| PoPP token retrieval for inserted eGK {} failed: {}",
           event.cardHandle(),
           e.getMessage());
-      publish(event.ctId(), new TokenRetrievalFailedMessage(event, e.getMessage()));
     } finally {
       currentRetrieval = null;
       inFlight.set(false);
     }
+  }
+
+  private void fetchAndPublishVsd(
+      final ConnectorCardInsertedEvent event, final Retrieval retrieval, final String token) {
+    if (!vsdm2ReadClient.isConfigured()) {
+      log.warn("| No vsdm2-client.url configured, skipping VSDM 2.0 fetch");
+      return;
+    }
+    try {
+      final var readVsdResponseXml = vsdm2ReadClient.readVsdResponseXml(token);
+      if (retrieval.cancelled) {
+        log.info("| Card {} was removed, discarding VSDM 2.0 data", event.cardHandle());
+        return;
+      }
+      publish(
+          event.ctId(),
+          new ReadVSDResponseMessage(event.ctId(), telematikId(), readVsdResponseXml));
+      log.info("| VSDM 2.0 data for inserted eGK {} published", event.cardHandle());
+    } catch (Exception e) {
+      log.error(
+          "| VSDM 2.0 fetch for inserted eGK {} failed: {}", event.cardHandle(), e.getMessage());
+    }
+  }
+
+  private String telematikId() {
+    return telematikIdProvider.getTelematikId();
   }
 
   private void publish(final String ctId, final Object message) {

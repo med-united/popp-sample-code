@@ -18,9 +18,23 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  */
 
-package de.servicehealth.refpopp.vsdm_client.properties;
+package de.servicehealth.refpopp.vsdm2_client.connector;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "vsdm-server")
-public record VsdServerProperties(String apiUrl) {}
+@ConfigurationProperties(prefix = "connector")
+public record ConnectorProperties(
+    String endPointUrl, String smcbIccsn, Secure secure, Context context) {
+
+  public record Secure(
+      boolean enable,
+      boolean hostnameValidation,
+      String keystore,
+      String keystorePassword,
+      boolean trustAll,
+      String truststore,
+      String truststorePassword) {}
+
+  public record Context(
+      String clientSystemId, String mandantId, String workplaceId, String userId) {}
+}

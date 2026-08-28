@@ -24,6 +24,7 @@ import de.gematik.ws.conn.eventservice.v7.Event;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -39,8 +40,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
@@ -49,6 +54,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.stereotype.Component;
+import org.w3c.dom.Node;
 
 /**
  * Listens for CETP event messages pushed by the connector. The connector acts as the TLS client: it
@@ -188,8 +194,11 @@ public class CetpEventListener {
 
   private void processEventMessage(final byte[] soapMessage) {
     final Event event;
+    final String eventXml;
     try {
-      event = unmarshalEvent(soapMessage);
+      final var eventNode = extractEventNode(soapMessage);
+      eventXml = nodeToString(eventNode);
+      event = (Event) eventServiceMarshaller.unmarshal(new DOMSource(eventNode));
     } catch (Exception e) {
       log.error("| Could not parse CETP event message: {}", e.getMessage());
       return;
@@ -198,32 +207,38 @@ public class CetpEventListener {
     final var parameters = extractParameters(event);
     log.info("| Received CETP event with topic {} and parameters {}", event.getTopic(), parameters);
 
-    if (TOPIC_CARD_INSERTED.equalsIgnoreCase(event.getTopic())) {
-      if (!CARD_TYPE_EGK.equalsIgnoreCase(parameters.get("CardType"))) {
-        log.debug("| Ignoring CARD/INSERTED event for card type {}", parameters.get("CardType"));
-        return;
+    try {
+      if (TOPIC_CARD_INSERTED.equalsIgnoreCase(event.getTopic())) {
+        if (!CARD_TYPE_EGK.equalsIgnoreCase(parameters.get("CardType"))) {
+          log.debug("| Ignoring CARD/INSERTED event for card type {}", parameters.get("CardType"));
+          return;
+        }
+        eventPublisher.publishEvent(
+            new ConnectorCardInsertedEvent(
+                parameters.get("CardHandle"),
+                parameters.get("CardType"),
+                parameters.get("CardVersion"),
+                parameters.get("ICCSN"),
+                parameters.get("CtID"),
+                parameters.get("SlotID"),
+                parameters.get("InsertTime"),
+                parameters.get("KVNR"),
+                eventXml));
+      } else if (TOPIC_CARD_REMOVED.equalsIgnoreCase(event.getTopic())) {
+        eventPublisher.publishEvent(
+            new ConnectorCardRemovedEvent(
+                parameters.get("CardHandle"),
+                parameters.get("CardType"),
+                parameters.get("CtID"),
+                parameters.get("SlotID"),
+                eventXml));
       }
-      eventPublisher.publishEvent(
-          new ConnectorCardInsertedEvent(
-              parameters.get("CardHandle"),
-              parameters.get("CardType"),
-              parameters.get("CardVersion"),
-              parameters.get("ICCSN"),
-              parameters.get("CtID"),
-              parameters.get("SlotID"),
-              parameters.get("InsertTime"),
-              parameters.get("KVNR")));
-    } else if (TOPIC_CARD_REMOVED.equalsIgnoreCase(event.getTopic())) {
-      eventPublisher.publishEvent(
-          new ConnectorCardRemovedEvent(
-              parameters.get("CardHandle"),
-              parameters.get("CardType"),
-              parameters.get("CtID"),
-              parameters.get("SlotID")));
+    } catch (Exception e) {
+      log.error("| Error handling CETP event with topic {}", event.getTopic(), e);
     }
   }
 
-  private Event unmarshalEvent(final byte[] soapMessage) throws Exception {
+  private Node extractEventNode(final byte[] soapMessage) throws Exception {
     final var documentBuilderFactory = DocumentBuilderFactory.newInstance();
     documentBuilderFactory.setNamespaceAware(true);
     documentBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -235,7 +250,16 @@ public class CetpEventListener {
     if (eventNodes.getLength() == 0) {
       throw new IllegalArgumentException("No Event element found in CETP message");
     }
-    return (Event) eventServiceMarshaller.unmarshal(new DOMSource(eventNodes.item(0)));
+    return eventNodes.item(0);
+  }
+
+  private String nodeToString(final Node node) throws TransformerException {
+    final var transformerFactory = TransformerFactory.newInstance();
+    transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    final var transformer = transformerFactory.newTransformer();
+    final var writer = new StringWriter();
+    transformer.transform(new DOMSource(node), new StreamResult(writer));
+    return writer.toString();
   }
 
   private Map<String, String> extractParameters(final Event event) {

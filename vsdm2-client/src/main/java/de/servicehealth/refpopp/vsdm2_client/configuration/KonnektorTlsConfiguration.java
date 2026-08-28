@@ -22,7 +22,7 @@ package de.servicehealth.refpopp.vsdm2_client.configuration;
 
 import de.servicehealth.refpopp.vsdm2_client.configuration.helper.NoHostNameValidationWrappedTrustManager;
 import de.servicehealth.refpopp.vsdm2_client.configuration.helper.TrustAllTrustManager;
-import de.servicehealth.refpopp.vsdm2_client.properties.ConnectorProperties;
+import de.servicehealth.refpopp.vsdm2_client.connector.ConnectorProperties;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;

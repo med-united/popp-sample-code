@@ -22,4 +22,4 @@ package de.gematik.refpopp.popp_client.connector.eventservice.cetp;
 
 /** A CARD/REMOVED event received from the connector via CETP. */
 public record ConnectorCardRemovedEvent(
-    String cardHandle, String cardType, String ctId, String slotId) {}
+    String cardHandle, String cardType, String ctId, String slotId, String cetpXml) {}
