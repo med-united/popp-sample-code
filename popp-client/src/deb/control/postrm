@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+if [ -d /run/systemd/system ]; then
+  systemctl --system daemon-reload >/dev/null || true
+fi
+
+case "$1" in
+  remove)
+    if [ -x /usr/bin/deb-systemd-helper ]; then
+      deb-systemd-helper mask popp-client.service >/dev/null || true
+    fi
+    ;;
+  purge)
+    if [ -x /usr/bin/deb-systemd-helper ]; then
+      deb-systemd-helper purge popp-client.service >/dev/null || true
+      deb-systemd-helper unmask popp-client.service >/dev/null || true
+    fi
+    rm -rf /var/lib/popp-client
+    rmdir /etc/popp-client 2>/dev/null || true
+    ;;
+esac
+
+exit 0

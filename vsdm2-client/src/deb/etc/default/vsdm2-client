@@ -1,0 +1,51 @@
+# Configuration for the vsdm2-client service.
+#
+# systemd reads this file as root before dropping to the vsdm2-client user, so
+# it is safe to keep secrets here (mode 0640, root-owned).
+#
+# Any key from application.yaml can be set here, not just the ones listed:
+# Spring Boot relaxed binding maps service-discovery.url -> SERVICE_DISCOVERY_URL,
+# and so on.
+#
+# Apply changes with:  systemctl restart vsdm2-client
+
+# --- JVM --------------------------------------------------------------------
+# JAVA=/usr/lib/jvm/java-21-openjdk-amd64/bin/java
+# The Konnektor WSDLs import xmldsig-core-schema.xsd, whose DOCTYPE references
+# an external DTD; without accessExternalDTD=all, CXF fails to build its ports.
+JAVA_OPTS="-Xmx512m -Djavax.xml.accessExternalDTD=all"
+
+# --- HTTP -------------------------------------------------------------------
+# SERVER_PORT=8083
+
+# --- Service discovery ------------------------------------------------------
+# SERVICE_DISCOVERY_URL=https://service-discovery.dev.ti-platform.de/catalog.json
+# SERVICE_DISCOVERY_REFRESH_MINUTES=60
+
+# --- Konnektor --------------------------------------------------------------
+CONNECTOR_END_POINT_URL=https://127.0.0.1
+CONNECTOR_SECURE_ENABLE=true
+CONNECTOR_SECURE_HOSTNAME_VALIDATION=false
+CONNECTOR_SECURE_TRUST_ALL=true
+# Client certificate for the Konnektor. Just copy it into /etc/vsdm2-client/ --
+# the service fixes ownership and mode of every *.p12 there when it starts.
+CONNECTOR_SECURE_KEYSTORE=/etc/vsdm2-client/konnektor.p12
+CONNECTOR_SECURE_KEYSTORE_PASSWORD=changeit
+# CONNECTOR_SECURE_TRUSTSTORE=/etc/vsdm2-client/truststore.p12
+# CONNECTOR_SECURE_TRUSTSTORE_PASSWORD=changeit
+
+# --- Konnektor context ------------------------------------------------------
+CONTEXT_MANDANT_ID=M1
+CONTEXT_CLIENT_SYSTEM_ID=C1
+CONTEXT_WORKPLACE_ID=W1
+# CONTEXT_USER_ID=
+# ICCSN of the SMC-B to use; empty picks the first SMC-B found
+# CONTEXT_SMCB_ICCSN=
+
+# --- ZETA -------------------------------------------------------------------
+# ZETA_SCOPE=vsdservice
+# ASL production environment toggle; false for DEV/RU/TU
+# ZETA_ASL_PROD=false
+# ZETA_CLIENT_DISABLE_SERVER_VALIDATION=true
+# ZETA_REQUIRED_ROLE_OID=
+# ZETA_STORAGE_AES_B64_KEY=

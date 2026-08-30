@@ -38,6 +38,9 @@ nb-configuration.xml
 # OSX
 .DS_Store
 
+# Mise
+mise.local.toml
+
 # Env file to override the configuration
 .env
 

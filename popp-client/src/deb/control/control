@@ -1,0 +1,14 @@
+Package: popp-client
+Version: [[version]]
+Section: net
+Priority: optional
+Architecture: all
+Depends: openjdk-21-jre-headless | java21-runtime-headless, adduser
+Maintainer: Service Health erx GmbH <info@service-health.de>
+Homepage: https://www.service-health.de/
+Description: gematik POPP client example application
+ Spring Boot service that drives a Konnektor to produce PoPP tokens for
+ electronic health cards. Serves HTTP on port 8081 and, when CETP is
+ enabled, listens for card events from the Konnektor on port 8585.
+ .
+ All settings are read from the environment file /etc/default/popp-client.

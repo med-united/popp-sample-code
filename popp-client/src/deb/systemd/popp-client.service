@@ -1,0 +1,29 @@
+[Unit]
+Description=gematik POPP client example application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=popp-client
+Group=popp-client
+EnvironmentFile=-/etc/default/popp-client
+StateDirectory=popp-client
+WorkingDirectory=/var/lib/popp-client
+# Every keystore must be readable by the service user. The leading '+' runs
+# this as root, outside the sandbox, before the JVM drops to popp-client.
+ExecStartPre=+/bin/sh -c 'chown root:popp-client /etc/popp-client/*.p12 && chmod 0640 /etc/popp-client/*.p12 || true'
+ExecStart=/bin/sh -c 'exec ${JAVA:-/usr/bin/java} $JAVA_OPTS -jar /usr/share/popp-client/popp-client.jar'
+Restart=on-failure
+RestartSec=5s
+# Spring Boot exits with 143 on SIGTERM
+SuccessExitStatus=143
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

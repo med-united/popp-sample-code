@@ -1,0 +1,40 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  configure)
+    if ! getent passwd popp-client >/dev/null; then
+      adduser --system --group --quiet --no-create-home \
+              --home /var/lib/popp-client \
+              --gecos "gematik POPP client" popp-client
+    fi
+    # Keystores here are opened by the JVM as user popp-client. Group-own the
+    # directory to the service and drop world access, so keys stay unreadable
+    # to everyone else. The unit re-applies this to *.p12 on every start.
+    chown root:popp-client /etc/popp-client
+    chmod 750 /etc/popp-client
+    ;;
+esac
+
+if [ -x /usr/bin/deb-systemd-helper ]; then
+  deb-systemd-helper unmask popp-client.service >/dev/null || true
+  if deb-systemd-helper --quiet was-enabled popp-client.service; then
+    deb-systemd-helper enable popp-client.service >/dev/null || true
+  else
+    deb-systemd-helper update-state popp-client.service >/dev/null || true
+  fi
+fi
+
+if [ -d /run/systemd/system ]; then
+  systemctl --system daemon-reload >/dev/null || true
+  # Restart on upgrade only. A fresh install has no Konnektor endpoint or
+  # keystore configured yet, so starting it would just crash-loop.
+  if [ -n "$2" ]; then
+    deb-systemd-invoke try-restart popp-client.service >/dev/null || true
+  else
+    echo "popp-client: edit /etc/default/popp-client, then run:"
+    echo "  systemctl start popp-client"
+  fi
+fi
+
+exit 0

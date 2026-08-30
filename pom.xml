@@ -61,6 +61,7 @@
     <version.bouncycastle.bcpkix>1.80</version.bouncycastle.bcpkix>
     <version.docker-maven-plugin>0.48.1</version.docker-maven-plugin>
     <version.jacoco-maven-plugin>0.8.15</version.jacoco-maven-plugin>
+    <version.jdeb>1.14</version.jdeb>
     <version.jjwt>0.13.0</version.jjwt>
     <version.lombok>1.18.46</version.lombok>
     <version.maven>3.8.6</version.maven>

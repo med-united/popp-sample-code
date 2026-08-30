@@ -1,0 +1,14 @@
+Package: vsdm2-client
+Version: [[version]]
+Section: net
+Priority: optional
+Architecture: all
+Depends: openjdk-21-jre-headless | java21-runtime-headless, adduser
+Maintainer: Service Health erx GmbH <info@service-health.de>
+Homepage: https://www.service-health.de/
+Description: VSDM 2.0 client application
+ Spring Boot service that reads insurance master data (VSDM 2.0) via the
+ Telematics Infrastructure, authenticating to the ZETA guard with an SMC-B
+ held by the Konnektor. Serves HTTP on port 8083.
+ .
+ All settings are read from the environment file /etc/default/vsdm2-client.

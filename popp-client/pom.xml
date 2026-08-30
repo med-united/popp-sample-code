@@ -23,6 +23,7 @@
       <docker.image.name>${docker.registry.gematik}/popp/popp-client</docker.image.name>
       <commit_hash>undefined</commit_hash>
       <skip.dockerbuild>true</skip.dockerbuild>
+      <skip.debbuild>false</skip.debbuild>
   </properties>
 
   <dependencies>
@@ -283,6 +284,66 @@
             </goals>
             <id>default</id>
             <phase>package</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.vafer</groupId>
+        <artifactId>jdeb</artifactId>
+        <version>${version.jdeb}</version>
+        <executions>
+          <execution>
+            <id>build-deb</id>
+            <goals>
+              <goal>jdeb</goal>
+            </goals>
+            <phase>package</phase>
+            <configuration>
+              <skip>${skip.debbuild}</skip>
+              <attach>false</attach>
+              <deb>${project.build.directory}/${project.artifactId}_${project.version}_all.deb</deb>
+              <controlDir>${basedir}/src/deb/control</controlDir>
+              <dataSet>
+                <data>
+                  <src>${project.build.directory}/${project.build.finalName}.jar</src>
+                  <dst>/usr/share/popp-client/popp-client.jar</dst>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <filemode>644</filemode>
+                  </mapper>
+                </data>
+                <data>
+                  <src>${basedir}/src/deb/systemd/popp-client.service</src>
+                  <dst>/usr/lib/systemd/system/popp-client.service</dst>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <filemode>644</filemode>
+                  </mapper>
+                </data>
+                <data>
+                  <src>${basedir}/src/deb/etc/default/popp-client</src>
+                  <dst>/etc/default/popp-client</dst>
+                  <type>file</type>
+                  <conffile>true</conffile>
+                  <mapper>
+                    <type>perm</type>
+                    <filemode>640</filemode>
+                  </mapper>
+                </data>
+                <data>
+                  <type>template</type>
+                  <paths>
+                    <path>/etc/popp-client</path>
+                  </paths>
+                  <mapper>
+                    <type>perm</type>
+                    <dirmode>755</dirmode>
+                  </mapper>
+                </data>
+              </dataSet>
+            </configuration>
           </execution>
         </executions>
       </plugin>

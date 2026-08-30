@@ -1,0 +1,59 @@
+# Configuration for the popp-client service.
+#
+# systemd reads this file as root before dropping to the popp-client user, so
+# it is safe to keep secrets here (mode 0640, root-owned).
+#
+# Any key from application.yaml can be set here, not just the ones listed:
+# Spring Boot relaxed binding maps popp-server.url -> POPP_SERVER_URL,
+# card-reader.name -> CARD_READER_NAME, and so on.
+#
+# Apply changes with:  systemctl restart popp-client
+
+# --- JVM --------------------------------------------------------------------
+# JAVA=/usr/lib/jvm/java-21-openjdk-amd64/bin/java
+JAVA_OPTS="-Xmx512m -Djava.util.prefs.userRoot=/var/lib/popp-client/.java-prefs -Djava.util.prefs.systemRoot=/var/lib/popp-client/.java-prefs"
+
+# --- HTTP -------------------------------------------------------------------
+# SERVER_PORT=8081
+
+# --- PoPP service -----------------------------------------------------------
+# POPP_SERVER_URL=wss://popp.dev.poppservice.de:443/popp/practitioner/api/v1/token-generation-ehc
+# FEDERATION_ENTITY_STATEMENT_URL=https://popp.dev.poppservice.de/.well-known/openid-federation
+
+# --- Konnektor --------------------------------------------------------------
+CONNECTOR_END_POINT_URL=https://127.0.0.1
+CONNECTOR_SECURE_ENABLE=true
+CONNECTOR_SECURE_HOSTNAME_VALIDATION=false
+CONNECTOR_SECURE_TRUST_ALL=true
+# Client certificate for the Konnektor. Just copy it into /etc/popp-client/ --
+# the service fixes ownership and mode of every *.p12 there when it starts.
+CONNECTOR_SECURE_KEYSTORE=/etc/popp-client/konnektor.p12
+CONNECTOR_SECURE_KEYSTORE_PASSWORD=changeit
+# CONNECTOR_SECURE_TRUSTSTORE=/etc/popp-client/truststore.p12
+# CONNECTOR_SECURE_TRUSTSTORE_PASSWORD=changeit
+
+# --- Konnektor context ------------------------------------------------------
+CONTEXT_MANDANT_ID=M1
+CONTEXT_CLIENT_SYSTEM_ID=C1
+CONTEXT_WORKPLACE_ID=W1
+# CARD_TERMINAL_ID=
+# CARD_TERMINAL_SLOT=
+
+# --- CETP card events -------------------------------------------------------
+CONNECTOR_CETP_ENABLED=false
+# IP/hostname of THIS machine, reachable from the Konnektor
+# CONNECTOR_CETP_EVENT_TO_URL=
+# CONNECTOR_CETP_EVENT_TO_PORT=8585
+# CONNECTOR_CETP_TLS_ENABLED=true
+# CONNECTOR_CETP_RESUBSCRIBE_INTERVAL_HOURS=6
+
+# --- ZETA -------------------------------------------------------------------
+# ZETA_AUTHENTICATION_SMB_KEYFILE=/etc/popp-client/smcb_private.p12
+# ZETA_AUTHENTICATION_SMB_ALIAS=alias
+# ZETA_AUTHENTICATION_SMB_PASSWORD=00
+# ZETA_STORAGE_AES_B64_KEY=
+# ZETA_CLIENT_DISABLE_SERVER_VALIDATION=true
+
+# --- VSDM 2.0 ---------------------------------------------------------------
+# Base URL of the vsdm2-client; empty disables the VSDM 2.0 fetch
+# VSDM2_CLIENT_URL=http://localhost:8083

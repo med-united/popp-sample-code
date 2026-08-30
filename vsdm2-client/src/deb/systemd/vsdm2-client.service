@@ -1,0 +1,29 @@
+[Unit]
+Description=VSDM 2.0 client application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=vsdm2-client
+Group=vsdm2-client
+EnvironmentFile=-/etc/default/vsdm2-client
+StateDirectory=vsdm2-client
+WorkingDirectory=/var/lib/vsdm2-client
+# Every keystore must be readable by the service user. The leading '+' runs
+# this as root, outside the sandbox, before the JVM drops to vsdm2-client.
+ExecStartPre=+/bin/sh -c 'chown root:vsdm2-client /etc/vsdm2-client/*.p12 && chmod 0640 /etc/vsdm2-client/*.p12 || true'
+ExecStart=/bin/sh -c 'exec ${JAVA:-/usr/bin/java} $JAVA_OPTS -jar /usr/share/vsdm2-client/vsdm2-client.jar'
+Restart=on-failure
+RestartSec=5s
+# Spring Boot exits with 143 on SIGTERM
+SuccessExitStatus=143
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

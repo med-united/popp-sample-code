@@ -19,7 +19,8 @@
     <properties>
         <docker.image.name>${docker.registry.gematik}/popp/vsdm2-client</docker.image.name>
         <commit_hash>undefined</commit_hash>
-        <skip.dockerbuild>false</skip.dockerbuild>
+        <skip.dockerbuild>true</skip.dockerbuild>
+        <skip.debbuild>false</skip.debbuild>
         <bouncycastle.version>1.84</bouncycastle.version>
         <api-telematik.version>2026-05-18</api-telematik.version>
         <cxf.version>4.1.3</cxf.version>
@@ -176,6 +177,66 @@
                         </goals>
                         <id>default</id>
                         <phase>package</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.vafer</groupId>
+                <artifactId>jdeb</artifactId>
+                <version>${version.jdeb}</version>
+                <executions>
+                    <execution>
+                        <id>build-deb</id>
+                        <goals>
+                            <goal>jdeb</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <skip>${skip.debbuild}</skip>
+                            <attach>false</attach>
+                            <deb>${project.build.directory}/${project.artifactId}_${project.version}_all.deb</deb>
+                            <controlDir>${basedir}/src/deb/control</controlDir>
+                            <dataSet>
+                                <data>
+                                    <src>${project.build.directory}/${project.build.finalName}.jar</src>
+                                    <dst>/usr/share/vsdm2-client/vsdm2-client.jar</dst>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <filemode>644</filemode>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${basedir}/src/deb/systemd/vsdm2-client.service</src>
+                                    <dst>/usr/lib/systemd/system/vsdm2-client.service</dst>
+                                    <type>file</type>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <filemode>644</filemode>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <src>${basedir}/src/deb/etc/default/vsdm2-client</src>
+                                    <dst>/etc/default/vsdm2-client</dst>
+                                    <type>file</type>
+                                    <conffile>true</conffile>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <filemode>640</filemode>
+                                    </mapper>
+                                </data>
+                                <data>
+                                    <type>template</type>
+                                    <paths>
+                                        <path>/etc/vsdm2-client</path>
+                                    </paths>
+                                    <mapper>
+                                        <type>perm</type>
+                                        <dirmode>755</dirmode>
+                                    </mapper>
+                                </data>
+                            </dataSet>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
