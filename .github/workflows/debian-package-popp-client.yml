@@ -1,0 +1,350 @@
+name: Release popp-client (date tag → Debian package)
+
+# POL-58. Adapted from med-united/epa4all's debian-package.yml (POL-57) and
+# med-united/kim-relay's (INFRA-2359), which earned their comments the hard way
+# over seven CI iterations. The infrastructure they rely on already exists and
+# is reused unchanged: the repository signing key (packages@service-health.de)
+# and the rrsync-restricted deploy access on packages.service-health.de.
+#
+# Three differences from both predecessors are deliberate and matter:
+#
+#  1. THIS REPOSITORY SHIPS TWO PACKAGES. popp-client and vsdm2-client are two
+#     modules of one Maven reactor, released independently, so tags carry the
+#     package name as a prefix: popp-client-2026-09-22. A bare date tag would
+#     be ambiguous - both workflows would fire and publish a package nobody
+#     asked to release. The prefix is verified below, not just matched by the
+#     trigger, because workflow_dispatch takes the tag as free text.
+#
+#  2. THE PACKAGE IS BUILT BY jdeb, NOT dpkg-buildpackage. There is no debian/
+#     directory and no changelog: src/deb/control/control carries a [[version]]
+#     token that jdeb fills from ${project.version}, and the .deb lands in
+#     popp-client/target/ rather than the parent of the checkout. So the place
+#     epa4all stamps with `dch --newversion` is stamped here with
+#     `mvn versions:set` - the artifact needs no moving, and the version
+#     carries no Debian revision suffix, which is not a style choice but a
+#     constraint jdeb imposes. See the version-resolution step.
+#
+#  3. api-telematik IS A GIT SUBMODULE AND A REACTOR MODULE, with its own
+#     groupId (de.servicehealth) and its own ${revision} version (2026-05-18).
+#     popp-client does not depend on it - it carries its own WSDLs under
+#     src/main/resources/api-telematik-OPB4/, and `-pl popp-client -am` resolves
+#     to just three modules: root, popp-commons, popp-client. The submodule
+#     still has to be checked out, because the root POM lists it as a <module>
+#     and Maven refuses to load a reactor whose child directory is missing.
+#     And versions:set MUST stay scoped to the root coordinates: an unscoped
+#     -DprocessAllModules would renumber api-telematik too, breaking
+#     vsdm2-client, which pins it by that literal version string.
+#
+# Releasing, following epa4all:
+#
+#   git tag popp-client-2026-09-22   && git push origin popp-client-2026-09-22
+#   git tag popp-client-2026-09-22-2 && git push origin popp-client-2026-09-22-2   # 2nd of the day
+#
+# A tag push builds, tests and publishes. What stands between a pushed tag and
+# the package server is the "package-release" GitHub Environment: its tag policy
+# restricts which refs may deploy, its required reviewers gate the publish job,
+# and the three secrets exist only in its scope. That environment does not exist
+# in this repository yet - see the publish job.
+#
+# workflow_dispatch has two modes:
+#   * tag given      -> re-release that existing tag. Select it as the ref too.
+#   * tag left blank -> ad-hoc build of the selected ref. The version gets a
+#                       "0~" prefix so it sorts below every real release, and
+#                       the .deb is a workflow artifact only. Never published.
+on:
+  push:
+    tags:
+      - 'popp-client-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing popp-client-<date> tag to re-release. Select that tag as the ref above. Leave blank for an ad-hoc build.'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.ver.outputs.mode }}
+      version: ${{ steps.ver.outputs.version }}
+      deb-version: ${{ steps.ver.outputs.deb_version }}
+
+    steps:
+    - name: Checkout (full history + submodules)
+      # submodules: recursive is not optional, even though popp-client does not
+      # depend on api-telematik: the root POM lists it as a <module>, and Maven
+      # aborts loading the reactor if that directory is empty.
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Resolve version and mode
+      id: ver
+      # deb_version converts the date tag into a valid Debian version by turning
+      # hyphens into dots, and does nothing else. popp-client-2026-09-22 ->
+      # 2026.09.22; the second release of that day, popp-client-2026-09-22-2 ->
+      # 2026.09.22.2, which sorts above it exactly as intended.
+      #
+      # Note what is deliberately NOT here: epa4all's "-1" Debian revision
+      # suffix. jdeb is not dpkg-buildpackage - it fills the control file's
+      # Version from ${project.version} through Maven's version sanitiser, which
+      # rewrites "-" to "+" (the same rule that turns 1.0-SNAPSHOT into
+      # 1.0+SNAPSHOT). A "2026.09.22-1" POM version therefore yields a file
+      # named popp-client_2026.09.22-1_all.deb whose control file says
+      # 2026.09.22+1, because the filename comes straight from the POM while the
+      # control version goes through the sanitiser. reprepro indexes the control
+      # version, not the filename, so the archive and the artifact would carry
+      # different versions. Confirmed by building both ways.
+      #
+      # Staying revision-less keeps the two identical and is the correct form
+      # regardless: this is a native package with no separate upstream tarball,
+      # exactly as kim-relay ships (1.0.15, no revision).
+      run: |
+        set -euo pipefail
+        PREFIX="popp-client-"
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          IN_TAG="${{ github.event.inputs.tag }}"
+          if [ -n "$IN_TAG" ]; then
+            MODE="release"
+            VERSION="$IN_TAG"
+            git checkout --quiet "refs/tags/${VERSION}"
+            git submodule update --init --recursive
+          else
+            MODE="manual"
+            VERSION="manual-$(git rev-parse --short HEAD)"
+          fi
+        else
+          MODE="release"
+          VERSION="${GITHUB_REF_NAME}"
+        fi
+
+        # The trigger pattern already enforces the prefix for a tag push, but
+        # workflow_dispatch takes the tag as free text - and this repository
+        # contains a second package whose tags look almost identical. Publishing
+        # popp-client because someone typed a vsdm2-client tag is exactly the
+        # kind of accident worth one comparison.
+        if [ "$MODE" = "release" ] && [ "${VERSION#${PREFIX}}" = "$VERSION" ]; then
+          echo "::error::Tag '${VERSION}' is not a popp-client release tag (expected ${PREFIX}<date>)."
+          echo "::error::vsdm2-client is released by its own workflow, debian-package-vsdm2-client.yml."
+          exit 1
+        fi
+
+        # Debian's upstream_version must start with a digit. True for any date,
+        # not for the ad-hoc "manual-<sha>" form - "0~" fixes that and, because
+        # "~" sorts before everything, guarantees such a build can never outrank
+        # the release it came from even if someone installs it by hand. Unlike
+        # "-", the tilde passes through jdeb untouched.
+        if [ "$MODE" = "manual" ]; then
+          DEB_VERSION="0~$(echo "$VERSION" | tr '-' '.')"
+        else
+          DEB_VERSION="$(echo "${VERSION#${PREFIX}}" | tr '-' '.')"
+        fi
+        echo "Mode: ${MODE} | Version: ${VERSION} | Debian version: ${DEB_VERSION}"
+        echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Stamp the release version into the POMs
+      # This is what `dch --newversion` does for epa4all. jdeb fills the
+      # [[version]] token in src/deb/control/control from ${project.version} and
+      # names the file ${project.artifactId}_${project.version}_all.deb, so the
+      # POM version IS the package version - there is nowhere else to set it.
+      #
+      # Scoped to the root coordinates on purpose: that updates the root POM and
+      # every module inheriting it, and leaves de.servicehealth:api-telematik at
+      # the ${revision} its dependents pin. Never add -DprocessAllModules here.
+      # Nothing is committed - this only stamps the CI checkout.
+      run: |
+        set -euo pipefail
+        mvn -B versions:set \
+          -DnewVersion="${{ steps.ver.outputs.deb_version }}" \
+          -DgroupId=de.gematik.refpopp \
+          -DartifactId=popp-example-impl-global \
+          -DgenerateBackupPoms=false
+
+    - name: Build, test and package
+      # One reactor run does all three: surefire runs the tests, and jdeb builds
+      # the .deb in the package phase, so a release can never be cut from red
+      # tests. Unlike epa4all and kim-relay there is no separate test step,
+      # because debian/rules - which built with -DskipTests there - is not
+      # involved at all.
+      #
+      # -pl popp-client -am builds only popp-client and what it needs - the root
+      # POM and popp-commons - skipping popp-server, vsdm2-client, the coverage
+      # report and api-telematik itself. `clean` is mandatory, not tidiness:
+      # popp-client generates JAXB classes and SOAP stubs with jaxb2/wsimport,
+      # and an incremental build leaves the stale-flag files under target/ in
+      # place, so XJC skips regenerating them and the jar silently ships
+      # without classes such as ConnectorServices - a build that succeeds and
+      # only fails at runtime with NoClassDefFoundError. See
+      # popp-client/INSTALL.md.
+      run: mvn -B clean verify -pl popp-client -am
+
+    - name: Locate build output
+      # jdeb writes into the module's own target/, so unlike dpkg-buildpackage
+      # there is no ".." path for actions/upload-artifact@v4 to reject and
+      # nothing to move.
+      id: artifact
+      run: |
+        set -euo pipefail
+        DEB="$(ls popp-client/target/popp-client_*_all.deb)"
+        echo "Built: ${DEB}"
+        echo "path=${DEB}" >> "$GITHUB_OUTPUT"
+        echo "name=$(basename "$DEB")" >> "$GITHUB_OUTPUT"
+
+    - name: Upload .deb as workflow artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: ${{ steps.artifact.outputs.path }}
+        retention-days: 30
+
+    - name: Upload .deb for the publish job
+      if: ${{ steps.ver.outputs.mode == 'release' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: deb-for-publish
+        path: ${{ steps.artifact.outputs.path }}
+        retention-days: 1
+
+  # Only runs for real releases - never for ad-hoc manual builds, and never for
+  # pull requests (this workflow has no pull_request trigger at all).
+  #
+  # SETUP REQUIRED: the "package-release" environment does not exist in this
+  # repository yet. Until it is created with a deployment tag policy
+  # (popp-client-* and vsdm2-client-*), required reviewers, and the three
+  # secrets below, this job cannot run. This repository is public, so required
+  # reviewers are available here - kim-relay had to fall back to a two-step
+  # manual publish precisely because they are not, on a private repository under
+  # the current billing plan. See POL-57 for the security rationale and
+  # INFRA-2250 for the restricted deploy key.
+  publish:
+    needs: build
+    if: ${{ needs.build.outputs.mode == 'release' }}
+    runs-on: ubuntu-latest
+    environment: package-release
+    # Serialises publishes against the vsdm2-client workflow in this repository,
+    # so two releases can never interleave their pull-reprepro-push round trips
+    # and silently revert each other - a real risk here, where one repository
+    # publishes two packages and a shared tag push can start both at once.
+    # cancel-in-progress stays false: a half-finished publish must run to
+    # completion rather than be killed mid-rsync.
+    #
+    # Note the limit: GitHub concurrency groups are per repository, so this
+    # cannot serialise against epa4all or kim-relay publishing to the same
+    # server, nor against a manual reprepro run from someone's laptop.
+    concurrency:
+      group: package-server-publish
+      cancel-in-progress: false
+
+    steps:
+    - name: Download .deb from build job
+      uses: actions/download-artifact@v4
+      with:
+        name: deb-for-publish
+        path: .
+
+    - name: Install reprepro and SSH client
+      run: sudo apt-get update && sudo apt-get install -y reprepro openssh-client rsync
+
+    - name: Set up SSH deploy key
+      # PACKAGES_SSH_KEY should hold a key dedicated to this repository, separate
+      # from epa4all's and kim-relay's, so any one can be revoked without
+      # affecting the others. Restricted server-side by a forced rrsync command
+      # in authorized_keys: rsync only, no shell, no forwarding, confined to
+      # /srv/www/vhosts/packages.service-health.de/.
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.ssh
+        echo "${{ secrets.PACKAGES_SSH_KEY }}" > ~/.ssh/id_deploy
+        chmod 600 ~/.ssh/id_deploy
+        ssh-keyscan -H packages.service-health.de >> ~/.ssh/known_hosts
+
+    - name: Import GPG signing key
+      # reprepro signs through gpgme internally rather than a gpg CLI call we
+      # control, so "pinentry-mode loopback" alone is not enough - nothing feeds
+      # it the passphrase, and there is no terminal for a prompt either way
+      # ("gpgme gave error GPGME:1: General error" is what that looks like).
+      # The passphrase is therefore pre-cached in gpg-agent, so any later
+      # signing operation finds the key already unlocked. (epa4all, CI
+      # iterations 6 and 7 - the two that cost the most time.)
+      env:
+        GPG_PASSPHRASE: ${{ secrets.PACKAGES_GPG_PASSPHRASE }}
+      run: |
+        set -euo pipefail
+        echo "${{ secrets.PACKAGES_GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+        echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+        echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+        gpgconf --reload gpg-agent
+        KEYGRIP="$(gpg --with-colons --with-keygrip --list-secret-keys packages@service-health.de | awk -F: '$1=="grp"{print $10; exit}')"
+        PRESET_BIN="$(find /usr/lib* -iname gpg-preset-passphrase 2>/dev/null | head -1)"
+        "$PRESET_BIN" --preset --passphrase "$GPG_PASSPHRASE" "$KEYGRIP"
+
+    - name: Download current repo state from the package server
+      # The package server has no reprepro - it only serves the static tree that
+      # gets rsynced up from wherever reprepro last ran. Mirroring that round
+      # trip keeps conf/distributions on the server as the single source of
+      # truth instead of duplicating it in this repo.
+      #
+      # Scoped to conf/, db/, dists/ and pool/main/p/ (popp-client's own pool
+      # slot), skipping the multi-GB pool entries of other packages that reprepro
+      # does not need to touch to include a new one. db/ - reprepro's repo-wide
+      # internal database - dominates what remains and cannot be scoped further
+      # without risking its consistency, so expect minutes, not seconds. No
+      # --delete anywhere: anything outside the filters is left untouched both
+      # locally and on the server.
+      #
+      # The remote path is deliberately bare "user@host:" with nothing after the
+      # colon. The restricted key forces `rrsync /srv/www/vhosts/...`, which
+      # already chdirs there; repeating the absolute path makes rrsync append it
+      # a second time underneath itself. IdentitiesOnly=yes forces this key
+      # rather than whatever else ssh might offer - which is also how epa4all
+      # discovered that an earlier "successful" test had silently used an
+      # unrestricted agent key. (CI iteration 5.)
+      run: |
+        set -euo pipefail
+        mkdir -p apt
+        rsync -az -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
+          --include='conf/' --include='conf/**' \
+          --include='db/' --include='db/**' \
+          --include='dists/' --include='dists/**' \
+          --include='pool/' --include='pool/main/' --include='pool/main/p/' --include='pool/main/p/**' \
+          --exclude='*' \
+          "${{ vars.PACKAGES_SSH_USER || 'ec2-user' }}@packages.service-health.de:" \
+          apt/
+
+    - name: Include the .deb in both distributions
+      # popp-client/INSTALL.md targets Debian 13 (trixie); noble is included as
+      # well so the package is installable on the Ubuntu hosts already served by
+      # this repository.
+      run: |
+        set -euo pipefail
+        export GPG_TTY=$(tty || true)
+        DEB="$(ls popp-client_*_all.deb)"
+        for codename in trixie noble; do
+          reprepro -V --basedir apt includedeb "$codename" "$DEB"
+        done
+
+    - name: Upload the updated repo state back to the package server
+      # Same scoping and same bare remote path as the download step, still
+      # without --delete: only the paths this job touched go back up.
+      run: |
+        set -euo pipefail
+        rsync -az -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
+          --include='conf/' --include='conf/**' \
+          --include='db/' --include='db/**' \
+          --include='dists/' --include='dists/**' \
+          --include='pool/' --include='pool/main/' --include='pool/main/p/' --include='pool/main/p/**' \
+          --exclude='*' \
+          apt/ \
+          "${{ vars.PACKAGES_SSH_USER || 'ec2-user' }}@packages.service-health.de:"

@@ -1,0 +1,292 @@
+name: Release vsdm2-client (date tag → Debian package)
+
+# POL-80, the sibling of debian-package-popp-client.yml (POL-58). The two are
+# deliberately kept as separate workflows rather than one matrixed over both
+# packages: they are released independently, and a matrix would make every
+# vsdm2-client release also republish popp-client.
+#
+# Read debian-package-popp-client.yml for the full rationale - it carries the
+# shared history (epa4all's POL-57 and kim-relay's INFRA-2359, seven CI
+# iterations' worth of comments). Only what differs for vsdm2-client, or what
+# would be dangerous to change without knowing, is repeated here.
+#
+# Releasing:
+#
+#   git tag vsdm2-client-2026-09-22   && git push origin vsdm2-client-2026-09-22
+#   git tag vsdm2-client-2026-09-22-2 && git push origin vsdm2-client-2026-09-22-2
+#
+# A tag push builds, tests and publishes, gated by the "package-release"
+# environment. workflow_dispatch re-releases an existing tag, or - with the tag
+# left blank - produces an ad-hoc "0~"-versioned artifact that is never
+# published.
+on:
+  push:
+    tags:
+      - 'vsdm2-client-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing vsdm2-client-<date> tag to re-release. Select that tag as the ref above. Leave blank for an ad-hoc build.'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.ver.outputs.mode }}
+      version: ${{ steps.ver.outputs.version }}
+      deb-version: ${{ steps.ver.outputs.deb_version }}
+
+    steps:
+    - name: Checkout (full history + submodules)
+      # submodules: recursive is not optional - vsdm2-client depends on
+      # de.servicehealth:api-telematik, which is a git submodule built as a
+      # reactor module and published to no repository at all.
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Resolve version and mode
+      id: ver
+      # vsdm2-client-2026-09-22 -> 2026.09.22; the second release of the day,
+      # vsdm2-client-2026-09-22-2 -> 2026.09.22.2, which sorts above it. Hyphens
+      # become dots, and nothing else happens.
+      #
+      # There is deliberately no "-1" Debian revision suffix, unlike epa4all:
+      # jdeb fills the control file's Version from ${project.version} through
+      # Maven's version sanitiser, which rewrites "-" to "+", while the .deb
+      # filename comes straight from the POM. A "2026.09.22-1" version would
+      # therefore produce vsdm2-client_2026.09.22-1_all.deb whose control file
+      # says 2026.09.22+1 - and reprepro indexes the control version. A native
+      # package with no upstream tarball wants no revision anyway.
+      run: |
+        set -euo pipefail
+        PREFIX="vsdm2-client-"
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          IN_TAG="${{ github.event.inputs.tag }}"
+          if [ -n "$IN_TAG" ]; then
+            MODE="release"
+            VERSION="$IN_TAG"
+            git checkout --quiet "refs/tags/${VERSION}"
+            git submodule update --init --recursive
+          else
+            MODE="manual"
+            VERSION="manual-$(git rev-parse --short HEAD)"
+          fi
+        else
+          MODE="release"
+          VERSION="${GITHUB_REF_NAME}"
+        fi
+
+        # workflow_dispatch takes the tag as free text, and this repository
+        # contains a second package whose tags look almost identical. Publishing
+        # vsdm2-client because someone typed a popp-client tag is exactly the
+        # kind of accident worth one comparison.
+        if [ "$MODE" = "release" ] && [ "${VERSION#${PREFIX}}" = "$VERSION" ]; then
+          echo "::error::Tag '${VERSION}' is not a vsdm2-client release tag (expected ${PREFIX}<date>)."
+          echo "::error::popp-client is released by its own workflow, debian-package-popp-client.yml."
+          exit 1
+        fi
+
+        # "0~" gives the ad-hoc "manual-<sha>" form the leading digit Debian
+        # requires, and sorts it below every real release. Unlike "-", the tilde
+        # passes through jdeb untouched.
+        if [ "$MODE" = "manual" ]; then
+          DEB_VERSION="0~$(echo "$VERSION" | tr '-' '.')"
+        else
+          DEB_VERSION="$(echo "${VERSION#${PREFIX}}" | tr '-' '.')"
+        fi
+        echo "Mode: ${MODE} | Version: ${VERSION} | Debian version: ${DEB_VERSION}"
+        echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Stamp the release version into the POMs
+      # jdeb fills the [[version]] token in src/deb/control/control from
+      # ${project.version} and names the file
+      # ${project.artifactId}_${project.version}_all.deb, so the POM version IS
+      # the package version - this step is what `dch --newversion` is for
+      # epa4all.
+      #
+      # Scoped to the root coordinates on purpose. vsdm2-client depends on
+      # api-telematik by the literal version in its ${api-telematik.version}
+      # property (2026-05-18); an unscoped -DprocessAllModules would renumber
+      # api-telematik to the release version and leave that dependency
+      # unresolvable. Never add it here. Nothing is committed.
+      run: |
+        set -euo pipefail
+        mvn -B versions:set \
+          -DnewVersion="${{ steps.ver.outputs.deb_version }}" \
+          -DgroupId=de.gematik.refpopp \
+          -DartifactId=popp-example-impl-global \
+          -DgenerateBackupPoms=false
+
+    - name: Build, test and package
+      # One reactor run builds, tests and packages: jdeb produces the .deb in the
+      # package phase, so there is no separate packaging step.
+      #
+      # `verify` rather than `package` is deliberate, but be honest about what
+      # it buys today: vsdm2-client has no test sources at all, so surefire
+      # reports "No tests to run" and this release gate passes vacuously. It is
+      # here so that the first test added to the module starts gating releases
+      # without anyone having to remember to change this workflow. Until then,
+      # unlike popp-client's 391 tests, nothing here stops a broken vsdm2-client
+      # from being published.
+      #
+      # -pl vsdm2-client -am builds the root POM, api-telematik and
+      # vsdm2-client, skipping popp-server, popp-client and the coverage
+      # report. `clean` is mandatory: an incremental build leaves the
+      # jaxb2 stale-flag files in api-telematik/target/jaxb2/ in place, XJC
+      # skips regenerating the JAXB classes, and the jar silently ships without
+      # them - a build that succeeds and fails only at runtime with
+      # NoClassDefFoundError. See vsdm2-client/INSTALL.md.
+      run: mvn -B clean verify -pl vsdm2-client -am
+
+    - name: Locate build output
+      # jdeb writes into the module's own target/, so there is no ".." path for
+      # actions/upload-artifact@v4 to reject and nothing to move.
+      id: artifact
+      run: |
+        set -euo pipefail
+        DEB="$(ls vsdm2-client/target/vsdm2-client_*_all.deb)"
+        echo "Built: ${DEB}"
+        echo "path=${DEB}" >> "$GITHUB_OUTPUT"
+        echo "name=$(basename "$DEB")" >> "$GITHUB_OUTPUT"
+
+    - name: Upload .deb as workflow artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: ${{ steps.artifact.outputs.path }}
+        retention-days: 30
+
+    - name: Upload .deb for the publish job
+      if: ${{ steps.ver.outputs.mode == 'release' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: deb-for-publish
+        path: ${{ steps.artifact.outputs.path }}
+        retention-days: 1
+
+  # Only runs for real releases - never for ad-hoc manual builds, and never for
+  # pull requests (this workflow has no pull_request trigger at all).
+  #
+  # SETUP REQUIRED: the "package-release" environment does not exist in this
+  # repository yet. It is shared with debian-package-popp-client.yml, so
+  # creating it once - tag policy popp-client-* and vsdm2-client-*, required
+  # reviewers, and the three secrets below - covers both workflows.
+  publish:
+    needs: build
+    if: ${{ needs.build.outputs.mode == 'release' }}
+    runs-on: ubuntu-latest
+    environment: package-release
+    # Same group as the popp-client workflow, and that is the point: the two
+    # must not interleave their pull-reprepro-push round trips against the same
+    # server and silently revert each other. cancel-in-progress stays false so a
+    # half-finished publish runs to completion rather than dying mid-rsync.
+    concurrency:
+      group: package-server-publish
+      cancel-in-progress: false
+
+    steps:
+    - name: Download .deb from build job
+      uses: actions/download-artifact@v4
+      with:
+        name: deb-for-publish
+        path: .
+
+    - name: Install reprepro and SSH client
+      run: sudo apt-get update && sudo apt-get install -y reprepro openssh-client rsync
+
+    - name: Set up SSH deploy key
+      # Restricted server-side by a forced rrsync command in authorized_keys:
+      # rsync only, no shell, no forwarding, confined to
+      # /srv/www/vhosts/packages.service-health.de/.
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.ssh
+        echo "${{ secrets.PACKAGES_SSH_KEY }}" > ~/.ssh/id_deploy
+        chmod 600 ~/.ssh/id_deploy
+        ssh-keyscan -H packages.service-health.de >> ~/.ssh/known_hosts
+
+    - name: Import GPG signing key
+      # reprepro signs through gpgme internally rather than a gpg CLI call we
+      # control, so "pinentry-mode loopback" alone is not enough - nothing feeds
+      # it the passphrase, and there is no terminal for a prompt either way
+      # ("gpgme gave error GPGME:1: General error" is what that looks like). The
+      # passphrase is pre-cached in gpg-agent instead, so any later signing
+      # operation finds the key already unlocked.
+      env:
+        GPG_PASSPHRASE: ${{ secrets.PACKAGES_GPG_PASSPHRASE }}
+      run: |
+        set -euo pipefail
+        echo "${{ secrets.PACKAGES_GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+        echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+        echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+        gpgconf --reload gpg-agent
+        KEYGRIP="$(gpg --with-colons --with-keygrip --list-secret-keys packages@service-health.de | awk -F: '$1=="grp"{print $10; exit}')"
+        PRESET_BIN="$(find /usr/lib* -iname gpg-preset-passphrase 2>/dev/null | head -1)"
+        "$PRESET_BIN" --preset --passphrase "$GPG_PASSPHRASE" "$KEYGRIP"
+
+    - name: Download current repo state from the package server
+      # The package server has no reprepro - it only serves the static tree that
+      # gets rsynced up from wherever reprepro last ran, so conf/distributions
+      # on the server stays the single source of truth.
+      #
+      # Scoped to conf/, db/, dists/ and pool/main/v/ - vsdm2-client's own pool
+      # slot, note "v" where the popp-client workflow uses "p". db/ dominates
+      # the transfer and cannot be scoped further without risking reprepro's
+      # consistency, so expect minutes, not seconds. No --delete anywhere.
+      #
+      # The remote path is deliberately bare "user@host:" with nothing after the
+      # colon: the restricted key forces `rrsync /srv/www/vhosts/...`, which has
+      # already chdir'd there, and repeating the absolute path makes rrsync
+      # append it a second time underneath itself. IdentitiesOnly=yes forces
+      # this key rather than whatever else ssh might offer.
+      run: |
+        set -euo pipefail
+        mkdir -p apt
+        rsync -az -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
+          --include='conf/' --include='conf/**' \
+          --include='db/' --include='db/**' \
+          --include='dists/' --include='dists/**' \
+          --include='pool/' --include='pool/main/' --include='pool/main/v/' --include='pool/main/v/**' \
+          --exclude='*' \
+          "${{ vars.PACKAGES_SSH_USER || 'ec2-user' }}@packages.service-health.de:" \
+          apt/
+
+    - name: Include the .deb in both distributions
+      # vsdm2-client/INSTALL.md targets Debian 13 (trixie); noble is included as
+      # well so the package is installable on the Ubuntu hosts already served by
+      # this repository.
+      run: |
+        set -euo pipefail
+        export GPG_TTY=$(tty || true)
+        DEB="$(ls vsdm2-client_*_all.deb)"
+        for codename in trixie noble; do
+          reprepro -V --basedir apt includedeb "$codename" "$DEB"
+        done
+
+    - name: Upload the updated repo state back to the package server
+      # Same scoping and same bare remote path as the download step, still
+      # without --delete: only the paths this job touched go back up.
+      run: |
+        set -euo pipefail
+        rsync -az -e "ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes" \
+          --include='conf/' --include='conf/**' \
+          --include='db/' --include='db/**' \
+          --include='dists/' --include='dists/**' \
+          --include='pool/' --include='pool/main/' --include='pool/main/v/' --include='pool/main/v/**' \
+          --exclude='*' \
+          apt/ \
+          "${{ vars.PACKAGES_SSH_USER || 'ec2-user' }}@packages.service-health.de:"
